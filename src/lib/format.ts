@@ -13,7 +13,7 @@ export function titleCaseKey(value: string): string {
 }
 
 export function valueText(plan: any): string {
-  return plan.valueDisplay || 'Provider-hidden limit';
+  return plan.valueDisplay || 'Provider-hidden numerical pool';
 }
 
 export function statusLabel(value: string): string {

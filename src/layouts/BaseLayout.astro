@@ -1,6 +1,7 @@
 ---
 import Nav from '../components/Nav.astro';
 import '../styles/global.css';
+import '../styles/quality.css';
 
 interface Props {
   title: string;
@@ -10,7 +11,7 @@ interface Props {
 
 const {
   title,
-  description = 'An evidence-weighted comparison of AI coding subscriptions, provider-hidden limits, model intelligence, task economics, and Pareto leaders.',
+  description = 'Evidence-backed comparisons of AI coding subscriptions, model quality, external coding-agent benchmarks, and quality-adjusted Pareto economics.',
   canonical
 } = Astro.props;
 const pageTitle = title === 'Tokenmaxx' ? title : `${title} · Tokenmaxx`;
@@ -31,12 +32,12 @@ const canonicalUrl = canonical || new URL(Astro.url.pathname, Astro.site || Astr
       <Nav />
       <main><slot /></main>
       <footer class="site-footer">
-        <p>Evidence snapshot: 17 August 2026. Provider-hidden limits stay hidden; no guessed pools enter rankings.</p>
+        <p>Evidence snapshot: 18 August 2026. External benchmarks only; hidden quotas remain ranges or explicit unknowns.</p>
         <div>
           <a href="/data/plans.json">Plans JSON</a>
-          <a href="/data/benchmarks.json">Benchmarks JSON</a>
           <a href="/data/models.json">Models JSON</a>
-          <a href="/data/leaders.json">Leaders JSON</a>
+          <a href="/data/benchmarks.json">Benchmarks JSON</a>
+          <a href="/data/subscription-task-estimates.json">Task estimates JSON</a>
           <a href="/schema/community-benchmark-submission.schema.json">Contribution schema</a>
         </div>
       </footer>

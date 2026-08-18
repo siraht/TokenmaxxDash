@@ -4,6 +4,7 @@ import plans from '../../data/plans.json';
 import sources from '../../data/sources.json';
 import benchmarks from '../../data/benchmarks.json';
 import models from '../../data/models.json';
+import qualityRoutes from '../../data/quality-routes.json';
 import taskEstimates from '../../data/subscription-task-estimates.json';
 import { formatNumber, statusLabel, titleCaseKey } from '../../lib/format';
 
@@ -14,6 +15,10 @@ export function getStaticPaths() {
 const { plan } = Astro.props;
 const sourcesById = new Map(sources.map((source) => [source.id, source]));
 const planSources = plan.sourceIds.map((id) => sourcesById.get(id)).filter(Boolean);
+const modelById = new Map(models.map((row) => [row.id, row]));
+const planModelCoverage = (plan.modelCoverageIds || []).map((id) => modelById.get(id)).filter(Boolean);
+const planRoutes = qualityRoutes.filter((row) => row.planId === plan.id).sort((a, b) => (b.codingAgentIndex ?? b.modelIntelligenceIndex ?? -1) - (a.codingAgentIndex ?? a.modelIntelligenceIndex ?? -1));
+const planTaskEstimates = taskEstimates.filter((row) => row.planId === plan.id).sort((a, b) => b.score - a.score || a.subscriptionUsdPerExpectedPassHigh - b.subscriptionUsdPerExpectedPassHigh);
 const agentMap = {
   'openai-codex': 'Codex',
   'claude-code': 'Claude Code',
@@ -22,15 +27,16 @@ const agentMap = {
 };
 const benchmarkAgent = agentMap[plan.providerId];
 const planBenchmarks = benchmarkAgent
-  ? benchmarks.filter((row) => row.agent === benchmarkAgent && row.benchmark === 'Artificial Analysis Coding Agent Index').slice(0, 8)
+  ? benchmarks.filter((row) => row.agent === benchmarkAgent && row.benchmark === 'Artificial Analysis Coding Agent Index').sort((a,b) => b.score-a.score).slice(0, 12)
   : [];
-const modelById = new Map(models.map((row) => [row.id, row]));
-const planModelCoverage = (plan.modelCoverageIds || []).map((id) => modelById.get(id)).filter(Boolean);
-const planTaskEstimates = taskEstimates.filter((row) => row.planId === plan.id).sort((a,b) => a.subscriptionUsdPerExpectedPass - b.subscriptionUsdPerExpectedPass).slice(0,8);
-const detailSections = Object.entries(plan.details || {}).filter(([, value]) => value != null);
+const isClaude = plan.providerId === 'claude-code';
+const claudeCategoryRows = plan.details?.modelCategoryTokenEconomics || [];
+const claudeAccessRows = plan.details?.modelAccess || [];
+const specialDetailKeys = new Set(['measurementMethod', 'rawTokenCostRange', 'apiEquivalentValueRange', 'modelAccess', 'modelCategoryTokenEconomics', 'modelCategoryEstimateMethod']);
+const detailSections = Object.entries(plan.details || {}).filter(([key, value]) => !specialDetailKeys.has(key) && value != null);
 
 const renderValue = (value) => {
-  if (typeof value === 'number') return formatNumber(value);
+  if (typeof value === 'number') return formatNumber(value, 6);
   if (typeof value === 'boolean') return value ? 'Yes' : 'No';
   if (Array.isArray(value)) return value.join(' – ');
   if (value && typeof value === 'object') return JSON.stringify(value);
@@ -41,6 +47,7 @@ const sectionHeaders = (value) => {
   const rows = sectionRows(value).filter((row) => row && typeof row === 'object');
   return [...new Set(rows.flatMap((row) => Object.keys(row)))];
 };
+const range = (low, high, digits = 3) => low == null || high == null ? '—' : `${formatNumber(low, digits)}–${formatNumber(high, digits)}`;
 ---
 <BaseLayout title={`${plan.provider} ${plan.name}`} description={plan.headline}>
   <section class="detail-hero">
@@ -75,9 +82,51 @@ const sectionHeaders = (value) => {
             <div class="definition"><dt>Eligibility</dt><dd>{plan.eligibility}</dd></div>
             <div class="definition"><dt>Benchmark coverage</dt><dd>{plan.benchmarkCoverage}</dd></div>
             <div class="definition"><dt>Last verified</dt><dd>{plan.lastVerified}</dd></div>
+            <div class="definition"><dt>Model routes with direct evidence</dt><dd>{planRoutes.filter((row) => row.rankingEligible).length} of {planRoutes.length}</dd></div>
           </dl>
         </div>
       </section>
+
+      {isClaude && (
+        <section class="panel emphasis-panel">
+          <div class="panel-header"><div><h3>Claude Code measured token economics</h3><p>Raw-token and API-equivalent denominators are both shown because Anthropic’s internal meter weights are hidden.</p></div><a href="/methodology#claude-inference">Method</a></div>
+          <div class="panel-body">
+            <div class="metric-ribbon compact-ribbon">
+              <div><strong>{plan.quotas.weeklyRawTokensBillionLow.toFixed(2)}–{plan.quotas.weeklyRawTokensBillionHigh.toFixed(2)}B</strong><span>mixed raw tokens/week</span></div>
+              <div><strong>{plan.quotas.averageMonthlyRawTokensBillionLow.toFixed(2)}–{plan.quotas.averageMonthlyRawTokensBillionHigh.toFixed(2)}B</strong><span>average raw tokens/month</span></div>
+              <div><strong>${plan.quotas.subscriptionUsdPerMillionRawTokensLow.toFixed(4)}–${plan.quotas.subscriptionUsdPerMillionRawTokensHigh.toFixed(4)}</strong><span>subscription $/M raw at full use</span></div>
+              <div><strong>${formatNumber(plan.quotas.averageMonthlyApiEquivalentUsdLow)}–${formatNumber(plan.quotas.averageMonthlyApiEquivalentUsdHigh)}</strong><span>API-equivalent/month</span></div>
+            </div>
+            <div class="callout warning" style="margin-top:14px"><strong>Measured range, not an official allowance.</strong> The raw-token figure is dominated by cached context reads. The API-equivalent range spans current conservative and historical accounting observations rather than pretending Anthropic’s meter is stable.</div>
+          </div>
+        </section>
+      )}
+
+      {isClaude && claudeAccessRows.length > 0 && (
+        <section class="panel">
+          <div class="panel-header"><div><h3>Claude model access</h3><p>Fable’s plan semantics differ from Opus, Sonnet, and Haiku.</p></div></div>
+          <div class="table-shell"><table><thead><tr><th>Model</th><th>Access mode</th><th>Maximum weekly-meter share</th><th>Interpretation</th></tr></thead><tbody>{claudeAccessRows.map((row) => (
+            <tr><td><strong>{row.model}</strong></td><td>{row.accessMode}</td><td class="numeric">{row.weeklyMeterShareMaxPct}%</td><td>{row.accessMode === 'payg-only' ? 'Not included in this subscription; Fable starts on usage credits.' : row.accessMode === 'included-capped' ? 'Included, but no more than half of the shared weekly meter and its hidden multiplier burns the meter faster.' : 'Included in the shared Claude + Claude Code quota.'}</td></tr>
+          ))}</tbody></table></div>
+        </section>
+      )}
+
+      {isClaude && claudeCategoryRows.length > 0 && (
+        <section class="panel">
+          <div class="panel-header"><div><h3>Model/category subscription $ per million tokens</h3><p>Pure-category counterfactuals derived from the measured API-equivalent pool and current public API rates.</p></div></div>
+          <div class="table-shell"><table><thead><tr><th>Model</th><th>Access</th><th>Token category</th><th>API rate/M</th><th>Estimated included M tokens/month</th><th>Effective subscription $/M</th></tr></thead><tbody>{claudeCategoryRows.map((row) => (
+            <tr>
+              <td><strong>{row.model}</strong><span class="cell-sub">{row.allowanceShareMaxPct}% maximum pool share</span></td>
+              <td>{row.accessMode}</td>
+              <td>{titleCaseKey(row.tokenCategory)}</td>
+              <td class="numeric">${row.apiRateUsdPerMillion.toFixed(3)}</td>
+              <td class="numeric">{range(row.estimatedMonthlyTokensMillionLow, row.estimatedMonthlyTokensMillionHigh, 2)}</td>
+              <td class="numeric"><strong>{row.subscriptionUsdPerMillionLow == null ? 'PAYG only' : `$${row.subscriptionUsdPerMillionLow.toFixed(5)}–$${row.subscriptionUsdPerMillionHigh.toFixed(5)}`}</strong></td>
+            </tr>
+          ))}</tbody></table></div>
+          <div class="panel-body"><p class="cell-sub">These rows do not assert that Anthropic meters the subscription exactly like the API. They answer: if the measured included API-equivalent value were spent entirely on this model and token category, how many tokens would it buy and what would the fixed subscription cost per million be? Sonnet 5 uses the published promotional API rate through 31 August 2026.</p></div>
+        </section>
+      )}
 
       {(plan.bindingUnknowns || []).length > 0 && (
         <section class="panel">
@@ -88,14 +137,37 @@ const sectionHeaders = (value) => {
 
       {Object.keys(plan.quotas || {}).length > 0 && (
         <section class="panel">
-          <div class="panel-header"><div><h3>Quota buckets</h3><p>Every applicable rolling or monthly bucket can become binding.</p></div></div>
-          <div class="panel-body">
-            <dl class="definition-grid">
-              {Object.entries(plan.quotas).map(([key, value]) => (
-                <div class="definition"><dt>{titleCaseKey(key)}</dt><dd>{renderValue(value)}</dd></div>
-              ))}
-            </dl>
-          </div>
+          <div class="panel-header"><div><h3>Quota buckets and derived limits</h3><p>Every applicable rolling or monthly bucket can become binding.</p></div></div>
+          <div class="panel-body"><dl class="definition-grid">{Object.entries(plan.quotas).map(([key, value]) => (
+            <div class="definition"><dt>{titleCaseKey(key)}</dt><dd>{renderValue(value)}</dd></div>
+          ))}</dl></div>
+        </section>
+      )}
+
+      {planRoutes.length > 0 && (
+        <section class="panel">
+          <div class="panel-header"><div><h3>Plan/model quality routes</h3><p>Exact model evidence, access mode, native-agent joins, and quality-adjusted capacity.</p></div><a href="/models">All models</a></div>
+          <div class="table-shell"><table><thead><tr><th>Advertised model</th><th>Access</th><th>External model intelligence</th><th>Native agent index</th><th>Quality band</th><th>Evidence-adjusted capacity</th><th>Transfer</th></tr></thead><tbody>{planRoutes.map((row) => (
+            <tr><td><strong>{row.model}</strong><span class="cell-sub">{row.resolvedModelVersion || row.routeNote}</span></td><td>{row.accessMode}</td><td class="numeric">{row.modelIntelligenceIndex ?? '—'}</td><td class="numeric">{row.codingAgentIndex ?? '—'}</td><td>{row.qualityBand || 'unranked'}</td><td class="numeric">{row.evidenceAdjustedQualityCapacity?.toFixed(3) ?? '—'}</td><td>{row.benchmarkTransfer}</td></tr>
+          ))}</tbody></table></div>
+        </section>
+      )}
+
+      {planTaskEstimates.length > 0 && (
+        <section class="panel">
+          <div class="panel-header"><div><h3>Direct subscription task estimates</h3><p>Native external benchmark routes joined to this plan’s conservative and high allowance bounds.</p></div><a href="/leaders">Pareto leaders</a></div>
+          <div class="table-shell"><table><thead><tr><th>Tested route</th><th>Index</th><th>API cost/task</th><th>Expected passes/month</th><th>Subscription $/expected pass</th><th>Evidence-adjusted worst case</th></tr></thead><tbody>{planTaskEstimates.map((row) => (
+            <tr><td><strong>{row.benchmarkModel}</strong><span class="cell-sub">{row.agent}</span></td><td class="numeric">{row.score}</td><td class="numeric">${row.apiCostPerTaskUsd.toFixed(2)}</td><td class="numeric">{range(row.expectedBenchmarkPassesPerAverageMonthLow, row.expectedBenchmarkPassesPerAverageMonthHigh, 1)}</td><td class="numeric">${row.subscriptionUsdPerExpectedPassLow.toFixed(3)}–${row.subscriptionUsdPerExpectedPassHigh.toFixed(3)}</td><td class="numeric"><strong>${row.evidenceAdjustedSubscriptionUsdPerExpectedPassHigh.toFixed(3)}</strong></td></tr>
+          ))}</tbody></table></div>
+        </section>
+      )}
+
+      {planModelCoverage.length > 0 && (
+        <section class="panel">
+          <div class="panel-header"><div><h3>Advertised model evidence coverage</h3><p>Every label receives a direct match or an explicit exclusion reason.</p></div><a href="/models">All model routes</a></div>
+          <div class="table-shell"><table><thead><tr><th>Model route</th><th>Coverage</th><th>Intelligence</th><th>Blended $/M</th><th>$/M/intelligence point</th><th>Best native-agent index</th></tr></thead><tbody>{planModelCoverage.map((row) => (
+            <tr><td><strong>{row.name}</strong><span class="cell-sub">{row.exclusionReason || row.resolvedModelVersion}</span></td><td>{row.benchmarkCoverage}</td><td class="numeric">{row.bestModelIntelligenceScore ?? '—'}</td><td class="numeric">{row.bestModelBlendedPricePerMUsd != null ? `$${row.bestModelBlendedPricePerMUsd.toFixed(3)}` : '—'}</td><td class="numeric">{row.blendedUsdPerIntelligencePoint != null ? `$${row.blendedUsdPerIntelligencePoint.toFixed(5)}` : '—'}</td><td class="numeric">{row.bestCodingAgentScore ?? '—'}</td></tr>
+          ))}</tbody></table></div>
         </section>
       )}
 
@@ -104,69 +176,30 @@ const sectionHeaders = (value) => {
         const headers = sectionHeaders(value);
         return (
           <section class="panel">
-            <div class="panel-header"><div><h3>{titleCaseKey(sectionName)}</h3><p>Plan-specific rates, limits or derived outputs.</p></div></div>
-            <div class="table-shell">
-              {headers.length > 0 ? (
-                <table>
-                  <thead><tr>{headers.map((header) => <th>{titleCaseKey(header)}</th>)}</tr></thead>
-                  <tbody>
-                    {rows.map((row) => (
-                      <tr>{headers.map((header) => <td class={typeof row?.[header] === 'number' ? 'numeric' : undefined}>{renderValue(row?.[header])}</td>)}</tr>
-                    ))}
-                  </tbody>
-                </table>
-              ) : <div class="panel-body"><pre class="formula">{JSON.stringify(value, null, 2)}</pre></div>}
-            </div>
+            <div class="panel-header"><div><h3>{titleCaseKey(sectionName)}</h3><p>Plan-specific rates, limits, or derived outputs.</p></div></div>
+            <div class="table-shell">{headers.length > 0 ? (
+              <table><thead><tr>{headers.map((header) => <th>{titleCaseKey(header)}</th>)}</tr></thead><tbody>{rows.map((row) => <tr>{headers.map((header) => <td class={typeof row?.[header] === 'number' ? 'numeric' : undefined}>{renderValue(row?.[header])}</td>)}</tr>)}</tbody></table>
+            ) : <div class="panel-body"><pre class="formula">{JSON.stringify(value, null, 2)}</pre></div>}</div>
           </section>
         );
       })}
 
-      {planModelCoverage.length > 0 && (
-        <section class="panel">
-          <div class="panel-header"><div><h3>Advertised model quality coverage</h3><p>Only direct external matches receive scores.</p></div><a href="/models">All models</a></div>
-          <div class="table-shell"><table><thead><tr><th>Model route</th><th>Coverage</th><th>Intelligence</th><th>Blended $/M</th><th>$/M/intelligence point</th></tr></thead><tbody>{planModelCoverage.map((row) => <tr><td><strong>{row.name}</strong></td><td>{row.benchmarkCoverage}</td><td class="numeric">{row.bestModelIntelligenceScore ?? '—'}</td><td class="numeric">{row.bestModelBlendedPricePerMUsd != null ? `$${row.bestModelBlendedPricePerMUsd.toFixed(3)}` : '—'}</td><td class="numeric">{row.blendedUsdPerIntelligencePoint != null ? `$${row.blendedUsdPerIntelligencePoint.toFixed(5)}` : '—'}</td></tr>)}</tbody></table></div>
-        </section>
-      )}
-
-      {planTaskEstimates.length > 0 && (
-        <section class="panel">
-          <div class="panel-header"><div><h3>Direct subscription task estimates</h3><p>Measured plan pool joined to a native external benchmark route.</p></div><a href="/leaders">Pareto leaders</a></div>
-          <div class="table-shell"><table><thead><tr><th>Model</th><th>Index</th><th>Expected passes/month</th><th>Subscription $/expected pass</th></tr></thead><tbody>{planTaskEstimates.map((row) => <tr><td><strong>{row.model}</strong></td><td class="numeric">{row.score}</td><td class="numeric">{row.expectedBenchmarkPassesPerAverageMonth.toLocaleString()}</td><td class="numeric">${row.subscriptionUsdPerExpectedPass.toFixed(4)}</td></tr>)}</tbody></table></div>
-        </section>
-      )}
-
       {planBenchmarks.length > 0 && (
         <section class="panel">
-          <div class="panel-header"><div><h3>External benchmark rows for this agent</h3><p>Artificial Analysis API-cost counterfactuals, not subscription cost allocations.</p></div><a href="/benchmarks">All benchmarks</a></div>
-          <div class="table-shell">
-            <table>
-              <thead><tr><th>Model</th><th>Index</th><th>DeepSWE</th><th>Terminal</th><th>API cost/task</th><th>Time/task</th></tr></thead>
-              <tbody>
-                {planBenchmarks.map((row) => (
-                  <tr><td><strong>{row.model}</strong></td><td class="numeric">{row.score}</td><td class="numeric">{row.deepSWE ?? '—'}%</td><td class="numeric">{row.terminalBenchV2 ?? '—'}%</td><td class="numeric">${row.apiCostPerTaskUsd?.toFixed(2)}</td><td class="numeric">{row.timePerTaskMinutes?.toFixed(1)}m</td></tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <div class="panel-header"><div><h3>External benchmark rows for this native agent</h3><p>API-cost counterfactuals, not subscription allocation.</p></div><a href="/benchmarks">All benchmarks</a></div>
+          <div class="table-shell"><table><thead><tr><th>Model</th><th>Index</th><th>DeepSWE</th><th>Terminal</th><th>API cost/task</th><th>API $/expected pass</th><th>Time/task</th></tr></thead><tbody>{planBenchmarks.map((row) => (
+            <tr><td><strong>{row.model}</strong></td><td class="numeric">{row.score}</td><td class="numeric">{row.deepSWE ?? '—'}%</td><td class="numeric">{row.terminalBenchV2 ?? '—'}%</td><td class="numeric">${row.apiCostPerTaskUsd?.toFixed(2)}</td><td class="numeric">${row.apiUsdPerExpectedPass?.toFixed(3)}</td><td class="numeric">{row.timePerTaskMinutes?.toFixed(1)}m</td></tr>
+          ))}</tbody></table></div>
         </section>
       )}
     </div>
 
     <aside class="detail-aside">
-      {plan.notes.length > 0 && (
-        <section class="panel"><div class="panel-header"><h3>Interpretation</h3></div><div class="panel-body"><ul class="note-list">{plan.notes.map((note) => <li>{note}</li>)}</ul></div></section>
-      )}
-      {plan.models.length > 0 && (
-        <section class="panel"><div class="panel-header"><h3>Models or catalog</h3></div><div class="panel-body"><div class="tag-list">{plan.models.map((model) => <span class="tag">{model}</span>)}</div></div></section>
-      )}
-      <section class="panel">
-        <div class="panel-header"><h3>Evidence</h3></div>
-        <div class="panel-body source-list">
-          {planSources.length ? planSources.map((source) => (
-            <a class="source-link" href={source.url} target="_blank" rel="noreferrer"><strong>{source.title}</strong><span>{source.publisher} · {source.type}</span></a>
-          )) : <p class="cell-sub">No attached source record yet.</p>}
-        </div>
-      </section>
+      {plan.notes.length > 0 && <section class="panel"><div class="panel-header"><h3>Interpretation</h3></div><div class="panel-body"><ul class="note-list">{plan.notes.map((note) => <li>{note}</li>)}</ul></div></section>}
+      {plan.models.length > 0 && <section class="panel"><div class="panel-header"><h3>Models or catalog</h3></div><div class="panel-body"><div class="tag-list">{plan.models.map((model) => <span class="tag">{model}</span>)}</div></div></section>}
+      <section class="panel"><div class="panel-header"><h3>Evidence</h3></div><div class="panel-body source-list">{planSources.length ? planSources.map((source) => (
+        <a class="source-link" href={source.url} target="_blank" rel="noreferrer"><strong>{source.title}</strong><span>{source.publisher} · {source.type}</span></a>
+      )) : <p class="cell-sub">No attached source record yet.</p>}</div></section>
       <a class="button" href="/plans">← Back to all plans</a>
     </aside>
   </div>
