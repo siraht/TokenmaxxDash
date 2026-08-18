@@ -10,14 +10,14 @@ As of **18 August 2026**, the generated dataset contains:
 
 - **219 subscription tiers** across **69 providers or product families**.
 - **77 advertised model labels**, each with a direct external match or an explicit exclusion reason.
-- **71 external benchmark rows** from publisher-owned model and coding-agent sources.
+- **83 external benchmark rows** from publisher-owned model and coding-agent sources, including CursorBench 3.2.
 - **293 plan/model access routes** with route version, access mode, transfer confidence, quality band, and plan evidence.
 - **68 native subscription-task estimates** where an exact externally tested agent/model route can be joined to a defensible plan denominator.
-- **Claude Fable 5** as a first-class model, Claude Code agent route, Terminal-Bench route, and Max-plan access route.
+- **Claude Fable 5** as a first-class model, Claude Code agent route, Terminal-Bench route, four CursorBench effort levels, and Max-plan access route.
 - **Claude Code Pro, Max 5×, and Max 20×** measured raw-token ranges, API-equivalent ranges, and per-model/per-token-category subscription-cost estimates.
 - Separate Pareto fronts for budget, passing-work throughput, API cost per expected pass, model price per intelligence point, speed, evidence-adjusted capacity, access price, and raw subsidy.
 
-The dashboard uses **external benchmarks only**. It does not currently run a private benchmark suite, simulate user workloads, or collect community telemetry. The repository includes a future community contribution schema and local JSON builder, but submitted results are not yet ingested.
+The dashboard imports Artificial Analysis model and Coding Agent Index results, Terminal-Bench 2.1, and CursorBench 3.2. It uses **external benchmarks only**. It does not currently run a private benchmark suite, simulate user workloads, or collect community telemetry. The repository includes a future community contribution schema and local JSON builder, but submitted results are not yet ingested.
 
 ## What changed from the allowance-only version
 
@@ -84,7 +84,7 @@ The project is fully static, so no Cloudflare adapter is required. `wrangler.jso
 
 ## Data pipeline
 
-The canonical evidence and calculation logic live in `scripts/build_data.py` and `scripts/complete_data.py`. `npm run prepare:data` deterministically regenerates the gitignored `src/data/` build inputs and mirrors them into gitignored `public/data/` JSON endpoints before local development or production builds:
+The canonical evidence and calculation logic live in `scripts/build_data.py`, `scripts/complete_data.py`, and `scripts/augment_external_benchmarks.py`. `npm run prepare:data` deterministically regenerates the gitignored `src/data/` build inputs and mirrors them into gitignored `public/data/` JSON endpoints before local development or production builds:
 
 ```text
 plans.json
@@ -107,10 +107,11 @@ python3 scripts/build_coverage.py
 npm run check:data
 ```
 
-The pipeline is split into two stages:
+The pipeline is split into three stages:
 
 1. `scripts/build_data.py` creates the broad plan catalog and provider-specific base calculations.
 2. `scripts/complete_data.py` adds current external model and agent evidence, Claude inference, exact route semantics, task economics, confidence adjustments, and Pareto fronts.
+3. `scripts/augment_external_benchmarks.py` imports publisher-owned benchmark tables whose cadence is independent of plan normalization, currently CursorBench 3.2.
 
 ## Validation
 
@@ -118,7 +119,7 @@ The pipeline is split into two stages:
 npm run verify
 ```
 
-The validator checks cross-file IDs, source provenance, status semantics, model-route completeness, benchmark-derived metrics, task-estimate ranges, Fable access behavior, all three Claude plan estimates, public-data mirrors, and the absence of active GitHub Actions workflows.
+The validators check cross-file IDs, source provenance, status semantics, model-route completeness, benchmark-derived metrics, task-estimate ranges, Fable access behavior, all three Claude plan estimates, every CursorBench cost/pass calculation, public-data mirrors, and the absence of active GitHub Actions workflows.
 
 ## Evidence refresh
 
