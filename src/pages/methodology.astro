@@ -2,32 +2,82 @@
 import BaseLayout from '../layouts/BaseLayout.astro';
 import methodology from '../data/methodology.json';
 ---
-<BaseLayout title="Methodology" description="How Tokenmaxx normalizes coding-plan allowances, provider-hidden limits, external task economics, model intelligence, and Pareto leaders.">
-  <section class="page-intro"><p class="eyebrow">Calculation rules</p><h1>Normalize each denominator, then compare only compatible outcomes.</h1><p class="lede">The market uses dollars, token credits, model calls, work units, energy, fair-use windows, and hidden pools. Tokenmaxx preserves those units, derives quality ratios from external publishers, and uses Pareto frontiers instead of forcing everything into one score.</p></section>
+<BaseLayout title="Methodology" description="How Tokenmaxx calculates subscription allowances, Claude and Codex token economics, external benchmark cost per task, intelligence-adjusted metrics, and Pareto frontiers.">
+  <section class="page-intro">
+    <p class="eyebrow">Calculation rules</p>
+    <h1>Normalize only quantities that share a real denominator.</h1>
+    <p class="lede">A request, weighted credit, raw token, API-equivalent dollar, coding-agent pass rate, and model Intelligence Index describe different mechanisms. Tokenmaxx keeps them separate, then joins them only when the plan, exact model route, harness, and evidence support the conversion.</p>
+  </section>
+
   <article class="prose section compact">
-    <h2>Evidence states</h2>
-    <div class="definition-grid">{Object.entries(methodology.calculationStatuses).map(([key,value]) => <div class="definition"><dt>{key}</dt><dd>{value}</dd></div>)}</div>
+    <h2>There is no universal winner</h2>
+    <p>A plan can lead raw allowance while losing badly on model quality. Another can expose the strongest model but deliver little sustained work before its weekly meter binds. The dashboard therefore publishes separate Pareto fronts for access price, native-agent cost per expected pass, sustainable passing-work throughput, model price per intelligence point, speed, evidence-adjusted allowance, and raw subsidy.</p>
 
-    <h2>Why “provider-hidden” is a result</h2>
-    <p>Some vendors publish price, models, relative multipliers, reset windows, and concurrency while withholding the numerical base pool. The correct completed record identifies those known mechanics, lists the missing binding denominator, and excludes the plan from allowance rankings. Replacing that gap with a message-count guess would make the dashboard more complete-looking and less true.</p>
+    <h2>External benchmarks only</h2>
+    <p>The current dashboard imports externally published results. It does not run a private benchmark suite, simulate coding workloads, or collect user telemetry. A benchmark row retains the tested model version, harness, reasoning effort, benchmark version, API-priced task cost, token use, latency, and source. Future community contributions use the included schema, but they remain a separate evidence class from publisher-owned leaderboards.</p>
 
-    <h2>Core allowance formulas</h2>
-    {Object.entries(methodology.formulas).map(([key,value]) => <><h3>{key}</h3><pre><code>{value}</code></pre></>)}
+    <h2>Model intelligence and coding-agent performance are separate</h2>
+    <p><strong>Model Intelligence Index</strong> measures a model configuration. <strong>Coding Agent Index</strong> and Terminal-Bench measure a model inside a particular harness. A plan that advertises the same model does not automatically inherit the native-agent score because routing, system prompts, context policy, tool implementation, fallback behavior, and reasoning effort can differ.</p>
 
-    <h2>Two quality layers</h2>
-    <p><strong>Coding Agent Index economics</strong> use an externally published pass-rate-like composite and API cost per task. That supports API dollars per expected pass because the denominator is a task attempt and the score is interpretable as a percentage. The model, reasoning mode, and agent harness stay attached to every row.</p>
-    <p><strong>Model Intelligence Index economics</strong> use the publisher’s 70% cache-read, 20% fresh-input, and 10% output blended token price. Dividing that price by Intelligence Index yields a cost-density signal per million blended tokens per index point. Intelligence Index is not a pass probability, so it is never converted into expected completed tasks.</p>
+    <h2>Cost per unit of intelligence</h2>
+    <pre><code>blended_price_per_M = 0.70 × cache_read_price
+                    + 0.20 × fresh_input_price
+                    + 0.10 × output_price
+
+USD_per_M_per_intelligence_point = blended_price_per_M / Intelligence_Index</code></pre>
+    <p>The 7:2:1 blend follows the external benchmark convention used by the imported model data. It is a normalized price-density signal, not a prediction of the user’s token mix and not a pass probability.</p>
+
+    <h2>Cost per successful external-benchmark task</h2>
+    <pre><code>API_USD_per_expected_pass = API_USD_per_task / (agent_score / 100)
+
+subscription_USD_per_expected_pass = subscription_price
+                                      / expected_passes_from_eligible_plan_pool</code></pre>
+    <p>Failed attempts remain in the numerator. The subscription conversion is published only when the tested native agent, exact plan model route, access mode, and a defensible included allowance can be joined. Short rolling windows and shared usage can still bind before the average monthly pool is exhausted.</p>
+
+    <h2 id="claude-inference">Claude Code plan inference</h2>
+    <p>Anthropic publishes prices, shared Claude/Claude Code limits, model access, and API token rates, but it does not publish absolute five-hour or weekly subscription pools. Tokenmaxx therefore uses two independent observed denominators:</p>
+    <ol>
+      <li><strong>Mixed raw tokens.</strong> ccusage and dashboard measurements imply roughly 0.20–0.28B raw tokens/week on Pro, 1.00–1.40B on Max 5×, and 4.00–5.60B on Max 20×. Cached context reads dominate these totals, so they are workload-specific.</li>
+      <li><strong>API-equivalent value.</strong> Reported weekly API-priced consumption and meter percentages imply a lower current-accounting bound and a higher historical bound. The dashboard shows the range instead of selecting whichever regime makes the plan look best.</li>
+    </ol>
+    <pre><code>average_monthly_raw_tokens = weekly_raw_tokens × 365.2425 / 12 / 7
+subscription_USD_per_M_raw = monthly_subscription_price
+                              / average_monthly_raw_tokens_in_millions
+
+average_monthly_API_value = weekly_API_equivalent × 365.2425 / 12 / 7
+value_multiple = average_monthly_API_value / monthly_subscription_price</code></pre>
+
+    <h3>Claude model/category estimates</h3>
+    <p>Each Claude plan page also shows pure-category counterfactuals for Opus 5, Fable 5, Sonnet 5, and Haiku 4.5:</p>
+    <pre><code>eligible_pool = measured_API_equivalent_pool × route_allowance_fraction
+category_capacity_M = eligible_pool / public_API_rate_per_M
+subscription_USD_per_M = subscription_price / category_capacity_M</code></pre>
+    <p>Opus, Sonnet, and Haiku can use the full shared included pool. Fable is PAYG-only on Pro; on Max it is included but capped at 50% of the shared weekly meter, so its estimates apply a 0.5 allowance fraction. Anthropic also says Fable consumes the meter faster, but the multiplier is hidden, so the dashboard does not invent a Fable raw-token ceiling.</p>
+
+    <h2>Codex credit calculation</h2>
+    <pre><code>uncached_input = total_input - cached_input
+credits = uncached_input / 1M × uncached_rate
+        + cached_input   / 1M × cached_rate
+        + output         / 1M × output_rate</code></pre>
+    <p>Reasoning tokens are already included in output when the log reports them that way, and cached input is a subset of total input. The inferred plan pool and the official model rate card remain separate evidence claims.</p>
+
+    <h2>Provider-rate pools and weighted plans</h2>
+    <pre><code>provider_rate_value = Σ(token_category × public_model_rate) + tool_charges
+weighted_plan_units = Σ(token_category × vendor_credit_rate) + request_or_tool_units</code></pre>
+    <p>OpenCode Go, Command Code, Chutes, StepFun, GLM, MiMo, Kiro, Copilot, Cursor, and other plans each get a provider-specific adapter. Five-hour, weekly, and monthly buckets remain separate because the smallest bucket can strand nominal monthly value.</p>
 
     <h2>Pareto frontiers</h2>
-    <p>A configuration is non-dominated when no other imported configuration is at least as capable and also cheaper, faster, or more generous on the selected axis. Tokenmaxx publishes separate frontiers for coding quality versus API cost, coding quality versus time, coding quality versus raw tokens, model intelligence versus blended price, model intelligence versus speed, monthly access price versus direct model intelligence, and quantified plan allowance versus direct model intelligence.</p>
-    <p>The dashboard includes a labeled <strong>quality-adjusted subsidy signal</strong> equal to plan value multiple × Intelligence Index / 100 and its inverse, subscription dollars per intelligence-weighted provider-value dollar. Both are heuristics; neither replaces the original two-axis frontier. Subscription dollars per Intelligence Index point is shown separately as an access-price density that deliberately ignores allowance size.</p>
+    <p>A row is Pareto-optimal only when no other eligible row is at least as good on every selected axis and strictly better on one. Tokenmaxx does not combine all values into one arbitrary score. The default plan surfaces impose a direct external intelligence floor of 60, then calculate separate budget and throughput fronts. Provider-specific fronts are also shown so one globally dominant product does not erase the best options inside another product family.</p>
 
-    <h2>Subscription task estimates</h2>
-    <p>A monthly expected-pass calculation is shown only when three facts align: the subscription has a quantified API-equivalent allowance, the external benchmark tested that native agent route, and the benchmark publishes API cost per task. At present the clean join is available for measured Codex plans and native Codex GPT-5.6 configurations. Five-hour windows, shared ChatGPT usage, and workload mix can still bind first.</p>
+    <h2>Evidence adjustment</h2>
+    <p>Measured ranges use conservative lower allowance bounds in rankings. A confidence factor reduces quality-adjusted capacity for measured or secondary evidence. The original values and the adjustment remain visible, so the user can disagree with the confidence penalty without losing the underlying calculation.</p>
 
-    <h2>External benchmarks and future community runs</h2>
-    <p>The current release imports external results only. The community contribution schema pins benchmark version, task-set hash, harness commit, model route, authentication mode, every attempt, verifier output, and redacted artifacts. Community results will remain a separate evidence lane rather than being silently merged into publisher-owned leaderboards.</p>
+    <h2>Calculation statuses</h2>
+    <div class="definition-grid">
+      {Object.entries(methodology.calculationStatuses).map(([key, value]) => <div class="definition"><dt>{key}</dt><dd>{value}</dd></div>)}
+    </div>
 
-    <h2>Principles enforced by the data model</h2><ul>{methodology.principles.map((item) => <li>{item}</li>)}</ul>
+    <h2>Community benchmark path</h2>
+    <p>The repository includes a browser-only submission builder and a versioned JSON Schema. A future contribution must pin the benchmark version, task-set hash, harness repository and commit, model alias and resolved model, subscription authentication route, environment, every attempt, verifier output, and redacted content-addressed artifacts. Community results will remain visibly separate until review.</p>
   </article>
 </BaseLayout>
