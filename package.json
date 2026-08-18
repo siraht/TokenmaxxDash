@@ -1,0 +1,26 @@
+{
+  "name": "tokenmaxx-dash",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "npm run check:data && astro build",
+    "preview": "astro preview",
+    "check": "astro check",
+    "check:data": "node scripts/validate-data.mjs",
+    "build:static": "python3 scripts/build_static.py",
+    "refresh:data": "python3 scripts/build_data.py && python3 scripts/enrich_data.py",
+    "watch:sources": "python3 scripts/watch_sources.py --write-state --save-snapshots",
+    "verify": "npm run check:data && python3 scripts/watch_sources.py --validate-only && npm run check:static && python3 -m py_compile scripts/*.py && node --check public/app.js && node --check public/community.js",
+    "check:static": "python3 scripts/check_static.py",
+    "refresh:benchmarks": "python3 scripts/refresh_external_benchmarks.py",
+    "refresh:coverage": "python3 scripts/build_coverage.py",
+    "refresh:review": "python3 scripts/watch_sources.py --write-state --save-snapshots && python3 scripts/refresh_external_benchmarks.py",
+    "refresh:all": "npm run refresh:data && npm run refresh:coverage && npm run build:static && npm run verify"
+  },
+  "dependencies": {
+    "astro": "7.2.2"
+  },
+  "devDependencies": {}
+}
