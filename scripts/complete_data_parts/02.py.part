@@ -1,0 +1,292 @@
+ "aa-gpt-5-6-sol",
+        "title": "GPT-5.6 Sol model analysis",
+        "publisher": "Artificial Analysis",
+        "url": "https://artificialanalysis.ai/models/gpt-5-6-sol",
+        "type": "external-benchmark",
+        "supports": ["Intelligence Index", "token prices", "speed", "evaluation cost"],
+        "verifiedAt": AS_OF,
+    },
+    {
+        "id": "aa-gpt-5-6-terra",
+        "title": "GPT-5.6 Terra model analysis",
+        "publisher": "Artificial Analysis",
+        "url": "https://artificialanalysis.ai/models/gpt-5-6-terra",
+        "type": "external-benchmark",
+        "supports": ["Intelligence Index", "token prices", "speed", "evaluation cost"],
+        "verifiedAt": AS_OF,
+    },
+    {
+        "id": "aa-gpt-5-6-luna",
+        "title": "GPT-5.6 Luna model analysis",
+        "publisher": "Artificial Analysis",
+        "url": "https://artificialanalysis.ai/models/gpt-5-6-luna",
+        "type": "external-benchmark",
+        "supports": ["Intelligence Index", "token prices", "speed", "evaluation cost"],
+        "verifiedAt": AS_OF,
+    },
+    {
+        "id": "aa-kimi-k3",
+        "title": "Kimi K3 model analysis",
+        "publisher": "Artificial Analysis",
+        "url": "https://artificialanalysis.ai/models/kimi-k3",
+        "type": "external-benchmark",
+        "supports": ["Intelligence Index", "token prices", "speed"],
+        "verifiedAt": AS_OF,
+    },
+    {
+        "id": "aa-glm-5-2",
+        "title": "GLM-5.2 model analysis",
+        "publisher": "Artificial Analysis",
+        "url": "https://artificialanalysis.ai/models/glm-5-2",
+        "type": "external-benchmark",
+        "supports": ["Intelligence Index", "token prices", "speed"],
+        "verifiedAt": AS_OF,
+    },
+    {
+        "id": "aa-mimo-v2-5-pro",
+        "title": "MiMo-V2.5-Pro model analysis",
+        "publisher": "Artificial Analysis",
+        "url": "https://artificialanalysis.ai/models/mimo-v2-5-pro",
+        "type": "external-benchmark",
+        "supports": ["Intelligence Index", "token prices", "speed"],
+        "verifiedAt": AS_OF,
+    },
+    {
+        "id": "aa-minimax-m3",
+        "title": "MiniMax-M3 model analysis",
+        "publisher": "Artificial Analysis",
+        "url": "https://artificialanalysis.ai/models/minimax-m3",
+        "type": "external-benchmark",
+        "supports": ["Intelligence Index", "token prices", "speed"],
+        "verifiedAt": AS_OF,
+    },
+    {
+        "id": "aa-deepseek-v4-flash-0731",
+        "title": "DeepSeek V4 Flash 0731 model analysis",
+        "publisher": "Artificial Analysis",
+        "url": "https://artificialanalysis.ai/models/deepseek-v4-flash",
+        "type": "external-benchmark",
+        "supports": ["Intelligence Index", "token prices", "current checkpoint identity"],
+        "verifiedAt": AS_OF,
+    },
+    {
+        "id": "aa-grok-4-5",
+        "title": "Grok 4.5 model analysis",
+        "publisher": "Artificial Analysis",
+        "url": "https://artificialanalysis.ai/models/grok-4-5",
+        "type": "external-benchmark",
+        "supports": ["Intelligence Index", "token prices", "speed"],
+        "verifiedAt": AS_OF,
+    },
+    {
+        "id": "aa-step-3-7-flash",
+        "title": "Step 3.7 Flash model analysis",
+        "publisher": "Artificial Analysis",
+        "url": "https://artificialanalysis.ai/models/step-3-7-flash",
+        "type": "external-benchmark",
+        "supports": ["Intelligence Index", "token prices", "speed"],
+        "verifiedAt": AS_OF,
+    },
+    {
+        "id": "aa-qwen-3-6-plus",
+        "title": "Qwen3.6 Plus model analysis",
+        "publisher": "Artificial Analysis",
+        "url": "https://artificialanalysis.ai/models/qwen3-6-plus",
+        "type": "external-benchmark",
+        "supports": ["Intelligence Index", "token prices", "speed"],
+        "verifiedAt": AS_OF,
+    },
+    {
+        "id": "aa-muse-spark-1-1",
+        "title": "Muse Spark 1.1 model analysis",
+        "publisher": "Artificial Analysis",
+        "url": "https://artificialanalysis.ai/models/muse-spark-1-1",
+        "type": "external-benchmark",
+        "supports": ["Intelligence Index", "token prices", "speed"],
+        "verifiedAt": AS_OF,
+    },
+    {
+        "id": "aa-deepseek-v4-pro",
+        "title": "DeepSeek V4 Pro model analysis",
+        "publisher": "Artificial Analysis",
+        "url": "https://artificialanalysis.ai/models/deepseek-v4-pro",
+        "type": "external-benchmark",
+        "supports": ["Intelligence Index", "token prices", "speed", "evaluation cost"],
+        "verifiedAt": AS_OF,
+    },
+    {
+        "id": "aa-kimi-k2-7-code",
+        "title": "Kimi K2.7 Code model analysis",
+        "publisher": "Artificial Analysis",
+        "url": "https://artificialanalysis.ai/models/kimi-k2-7-code",
+        "type": "external-benchmark",
+        "supports": ["Intelligence Index", "token prices", "speed", "evaluation cost"],
+        "verifiedAt": AS_OF,
+    },
+    {
+        "id": "aa-kimi-k2-6",
+        "title": "Kimi K2.6 model analysis",
+        "publisher": "Artificial Analysis",
+        "url": "https://artificialanalysis.ai/models/kimi-k2-6",
+        "type": "external-benchmark",
+        "supports": ["Intelligence Index", "token prices", "speed", "evaluation cost", "deprecated status"],
+        "verifiedAt": AS_OF,
+    },
+    {
+        "id": "aa-minimax-m2-7",
+        "title": "MiniMax-M2.7 model analysis",
+        "publisher": "Artificial Analysis",
+        "url": "https://artificialanalysis.ai/models/minimax-m2-7",
+        "type": "external-benchmark",
+        "supports": ["Intelligence Index", "token prices", "speed", "deprecated status"],
+        "verifiedAt": AS_OF,
+    },
+    {
+        "id": "aa-glm-4-7",
+        "title": "GLM-4.7 model analysis",
+        "publisher": "Artificial Analysis",
+        "url": "https://artificialanalysis.ai/models/glm-4-7",
+        "type": "external-benchmark",
+        "supports": ["Intelligence Index", "token prices", "speed", "deprecated status"],
+        "verifiedAt": AS_OF,
+    },
+    {
+        "id": "aa-glm-5-turbo",
+        "title": "GLM-5-Turbo model analysis",
+        "publisher": "Artificial Analysis",
+        "url": "https://artificialanalysis.ai/models/glm-5-turbo",
+        "type": "external-benchmark",
+        "supports": ["estimated Intelligence Index", "context", "deprecated status"],
+        "verifiedAt": AS_OF,
+    },
+    {
+        "id": "aa-qwen3-5-omni-flash",
+        "title": "Qwen3.5 Omni Flash model analysis",
+        "publisher": "Artificial Analysis",
+        "url": "https://artificialanalysis.ai/models/qwen3-5-omni-flash",
+        "type": "external-benchmark",
+        "supports": ["estimated Intelligence Index", "token prices", "speed"],
+        "verifiedAt": AS_OF,
+    },
+    {
+        "id": "aa-qwen3-7-plus",
+        "title": "Qwen3.7 Plus model comparison",
+        "publisher": "Artificial Analysis",
+        "url": "https://artificialanalysis.ai/models/comparisons/qwen3-7-plus-vs-qwen3-max",
+        "type": "external-benchmark",
+        "supports": ["Intelligence Index", "blended price", "speed", "context"],
+        "verifiedAt": AS_OF,
+    },
+    {
+        "id": "aa-gemma-4-31b",
+        "title": "Gemma 4 31B model analysis",
+        "publisher": "Artificial Analysis",
+        "url": "https://artificialanalysis.ai/articles/gemma-4-everything-you-need-to-know",
+        "type": "external-benchmark",
+        "supports": ["Intelligence Index", "model identity"],
+        "verifiedAt": AS_OF,
+    },
+    {
+        "id": "aa-hy3",
+        "title": "Hy3 model analysis",
+        "publisher": "Artificial Analysis",
+        "url": "https://artificialanalysis.ai/models/hy3",
+        "type": "external-benchmark",
+        "supports": ["Intelligence Index", "token prices", "speed", "evaluation cost"],
+        "verifiedAt": AS_OF,
+    },
+    {
+        "id": "aa-qwen3-7-max",
+        "title": "Qwen3.7 Max model analysis",
+        "publisher": "Artificial Analysis",
+        "url": "https://artificialanalysis.ai/models/qwen3-7-max",
+        "type": "external-benchmark",
+        "supports": ["Intelligence Index", "token prices", "speed", "evaluation cost"],
+        "verifiedAt": AS_OF,
+    },
+    {
+        "id": "secondary-qwen3-8-max",
+        "title": "Qwen3.8 Max benchmark snapshot",
+        "publisher": "Dataconomy (attributing Artificial Analysis data)",
+        "url": "https://dataconomy.com/ai-models/qwen3-8-max/",
+        "type": "secondary-benchmark",
+        "supports": ["Intelligence Index", "Coding Index", "input and output pricing"],
+        "verifiedAt": AS_OF,
+    },
+    {
+        "id": "aa-coding-grok-build",
+        "title": "Claude Code vs Grok Build coding-agent comparison",
+        "publisher": "Artificial Analysis",
+        "url": "https://artificialanalysis.ai/agents/coding-agents/comparisons/claude-code-vs-grok-build",
+        "type": "external-benchmark",
+        "supports": ["Coding Agent Index", "cost/task", "time/task", "tokens/task"],
+        "verifiedAt": AS_OF,
+    },
+    {
+        "id": "aa-coding-opencode",
+        "title": "Claude Code vs OpenCode coding-agent comparison",
+        "publisher": "Artificial Analysis",
+        "url": "https://artificialanalysis.ai/agents/coding-agents/comparisons/claude-code-vs-opencode",
+        "type": "external-benchmark",
+        "supports": ["Coding Agent Index", "cost/task", "time/task", "tokens/task"],
+        "verifiedAt": AS_OF,
+    },
+    {
+        "id": "aa-coding-methodology",
+        "title": "Coding Agent Index methodology",
+        "publisher": "Artificial Analysis",
+        "url": "https://artificialanalysis.ai/methodology/coding-agents-benchmarking",
+        "type": "external-methodology",
+        "supports": ["index construction", "pass@1 aggregation", "cost and telemetry semantics"],
+        "verifiedAt": AS_OF,
+    },
+    {
+        "id": "terminal-bench-2-1",
+        "title": "Terminal-Bench 2.1 leaderboard",
+        "publisher": "Terminal-Bench",
+        "url": "https://www.tbench.ai/leaderboard/terminal-bench/2.1",
+        "type": "external-benchmark",
+        "supports": ["agent/model/effort accuracy", "reported total run cost"],
+        "verifiedAt": AS_OF,
+    },
+]
+for source in NEW_SOURCES:
+    upsert(sources, source)
+source_by_id = {source["id"]: source for source in sources}
+
+# ---------------------------------------------------------------------------
+# Current external benchmarks
+# ---------------------------------------------------------------------------
+# Retain old coding-agent variants that remain part of the current v1.3 table,
+# but replace model-intelligence and Terminal-Bench snapshots with current rows.
+benchmarks = [
+    b for b in base_benchmarks
+    if b.get("kind") == "coding-agent"
+    and b.get("benchmark") == "Artificial Analysis Coding Agent Index"
+]
+
+# Correct legacy $/expected-pass derived fields and attach Pareto flags later.
+for row in benchmarks:
+    score = row.get("score")
+    cost = row.get("apiCostPerTaskUsd")
+    time = row.get("timePerTaskMinutes")
+    tokens = row.get("tokensPerTaskM")
+    if score:
+        pass_rate = score / 100
+        row["apiUsdPerExpectedPass"] = round(cost / pass_rate, 6) if cost is not None else None
+        row["expectedPassesPerApiDollar"] = round(pass_rate / cost, 6) if cost else None
+        row["minutesPerExpectedPass"] = round(time / pass_rate, 6) if time is not None else None
+        row["tokensPerExpectedPassM"] = round(tokens / pass_rate, 6) if tokens is not None else None
+    row["retrievedAt"] = AS_OF
+
+# Current rows not present in the base catalog.
+for row in [
+    agent_benchmark(
+        id="aa-agent-claude-code-opus-5-low", agent="Claude Code", model="Opus 5 (low)",
+        score=57, cost=2.18, time=9.5, tokens=5.2, deep=57, terminal=74, atlas=39,
+        source_id="aa-coding-grok-build",
+    ),
+    agent_benchmark(
+        id="aa-agent-claude-code-opus-4-8-xhigh", agent="Claude Code", model="Opus 4.8 (xhigh)",
+        score=58, cost=5.67, time=17.6, tokens=13.8, deep=51, terminal=81, atlas=43,
+        source_id="aa-codin

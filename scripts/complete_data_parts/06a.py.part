@@ -1,0 +1,97 @@
+e"] = "no-external-benchmark"
+
+# Normalize explicit dollar-equivalent pools before route construction so task-economics
+# eligibility is computed from the final plan record, not the pre-enrichment snapshot.
+for plan in plans:
+    if plan["providerId"] in {"openai-codex", "cursor"} and plan.get("includedValueUsdMonthly") is not None:
+        plan.setdefault("includedValueUsdMonthlyLow", plan["includedValueUsdMonthly"])
+        plan.setdefault("includedValueUsdMonthlyHigh", plan["includedValueUsdMonthly"])
+
+# One route per plan × advertised label. Crucially, route access and benchmark transfer are explicit.
+quality_routes: list[dict[str, Any]] = []
+plan_by_id = {p["id"]: p for p in plans}
+model_by_id = {m["id"]: m for m in models}
+for plan in plans:
+    for label in plan.get("models", []):
+        model = model_by_label[label]
+        access_mode, included, allowance_fraction = route_access(plan, label)
+        model_benchmark_row = benchmark_by_id.get(model["directModelBenchmarkIds"][0]) if model["directModelBenchmarkIds"] else None
+        native_ids = NATIVE_ROUTE_BENCHMARKS.get((plan["providerId"], label), [])
+        native_rows = [benchmark_by_id[x] for x in native_ids if x in benchmark_by_id]
+        best_native = max(native_rows, key=lambda r: r["score"]) if native_rows else None
+        transfer = "direct-native" if best_native else ("model-only" if model_benchmark_row else "none")
+        intelligence = model_benchmark_row.get("score") if model_benchmark_row else None
+        agent_score = best_native.get("score") if best_native else None
+        lower_multiple = plan.get("valueMultipleLow")
+        if lower_multiple is None:
+            lower_multiple = plan.get("valueMultiple")
+        point_multiple = plan.get("valueMultiple")
+        quality_score = agent_score if agent_score is not None else intelligence
+        quality_adjusted = (
+            lower_multiple * allowance_fraction * (quality_score / 100)
+            if lower_multiple is not None and quality_score is not None and included else None
+        )
+        route_confidence_factor = min(confidence_factor(plan.get("confidence")), confidence_factor(model.get("routeVersionConfidence")))
+        evidence_adjusted_capacity = quality_adjusted * route_confidence_factor if quality_adjusted is not None else None
+        source_types = {source_by_id[source_id]["type"] for source_id in plan.get("sourceIds", []) if source_id in source_by_id}
+        official_only_denominator = "community-measurement" not in source_types and plan.get("calculationStatus") in {"exact", "derived", "partial"}
+        quality_routes.append({
+            "id": f"route-{plan['id']}-{slug(label)}",
+            "planId": plan["id"],
+            "modelId": model["id"],
+            "providerId": plan["providerId"],
+            "provider": plan["provider"],
+            "plan": plan["name"],
+            "priceMonthly": plan.get("priceMonthly"),
+            "model": label,
+            "resolvedModelVersion": model.get("resolvedModelVersion"),
+            "routeVersionConfidence": model.get("routeVersionConfidence"),
+            "accessMode": access_mode,
+            "includedInSubscription": included,
+            "routeAllowanceFractionMax": allowance_fraction,
+            "benchmarkTransfer": transfer,
+            "modelIntelligenceIndex": intelligence,
+            "codingAgentIndex": agent_score,
+            "qualityScoreForBand": quality_score,
+            "qualityBand": quality_band(quality_score),
+            "modelBlendedPricePerMUsd": model_benchmark_row.get("blendedPricePerMUsd") if model_benchmark_row else None,
+            "modelBlendedUsdPerIntelligencePoint": model_benchmark_row.get("blendedUsdPerIntelligencePoint") if model_benchmark_row else None,
+            "planValueMultipleLowerBound": lower_multiple,
+            "planValueMultiplePoint": point_multiple,
+            "conservativeQualityAdjustedCapacity": round_or_none(quality_adjusted),
+            "evidenceConfidenceFactor": round(route_confidence_factor, 3),
+            "evidenceAdjustedQualityCapacity": round_or_none(evidence_adjusted_capacity),
+            "officialOnlyAllowanceEvidence": official_only_denominator,
+            "subscriptionUsdPerIntelligencePoint": round(plan["priceMonthly"] / intelligence, 6) if intelligence and plan.get("priceMonthly") else None,
+            "nativeAgentBenchmarkId": best_native.get("id") if best_native else None,
+            "nativeAgentBenchmarkIds": [row["id"] for row in native_rows],
+            "nativeTaskEconomicsEligible": bool(native_rows and included and plan.get("includedValueUsdMonthlyLow") is not None),
+            "rankingEligible": bool(included and quality_score is not None and plan["status"] == "active"),
+            "planCalculationStatus": plan["calculationStatus"],
+            "planConfidence": plan["confidence"],
+            "planValueDisplay": plan["valueDisplay"],
+            "routeNote": model.get("routeNote"),
+        })
+
+# ---------------------------------------------------------------------------
+# Direct subscription task economics, with ranges and route caps
+# ---------------------------------------------------------------------------
+# Exact and point-estimated dollar pools were normalized before route construction.
+subscription_task_estimates: list[dict[str, Any]] = []
+for route in quality_routes:
+    if not route["nativeTaskEconomicsEligible"]:
+        continue
+    plan = plan_by_id[route["planId"]]
+    fraction = route["routeAllowanceFractionMax"]
+    value_low = plan.get("includedValueUsdMonthlyLow")
+    value_high = plan.get("includedValueUsdMonthlyHigh")
+    if value_low is None or value_high is None or plan.get("priceMonthly") is None:
+        continue
+    value_low *= fraction
+    value_high *= fraction
+    for benchmark_id in route.get("nativeAgentBenchmarkIds", []):
+        bench = benchmark_by_id.get(benchmark_id)
+        if not bench:
+            continue
+        cost = bench.get("apiCostPerTaskUsd")
+        scor

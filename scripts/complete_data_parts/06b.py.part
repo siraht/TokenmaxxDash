@@ -1,0 +1,114 @@
+e = bench.get("score")
+        if not cost or not score:
+            continue
+        attempts_low = value_low / cost
+        attempts_high = value_high / cost
+        passes_low = attempts_low * score / 100
+        passes_high = attempts_high * score / 100
+        if passes_low <= 0:
+            continue
+        price = plan["priceMonthly"]
+        evidence_factor = min(confidence_factor(plan.get("confidence")), confidence_factor(route.get("routeVersionConfidence")))
+        evidence_passes_low = passes_low * evidence_factor
+        subscription_task_estimates.append({
+            "id": f"task-{route['id']}-{bench['id']}",
+            "planId": plan["id"],
+            "routeId": route["id"],
+            "benchmarkId": bench["id"],
+            "provider": plan["provider"],
+            "plan": plan["name"],
+            "priceMonthly": price,
+            "model": route["model"],
+            "benchmarkModel": bench["model"],
+            "agent": bench["agent"],
+            "qualityBand": quality_band(score),
+            "score": score,
+            "apiCostPerTaskUsd": cost,
+            "routeAllowanceFractionMax": fraction,
+            "includedApiEquivalentUsdPerAverageMonthLow": round(value_low, 2),
+            "includedApiEquivalentUsdPerAverageMonthHigh": round(value_high, 2),
+            "estimatedAttemptsPerAverageMonthLow": round(attempts_low, 2),
+            "estimatedAttemptsPerAverageMonthHigh": round(attempts_high, 2),
+            "expectedBenchmarkPassesPerAverageMonthLow": round(passes_low, 2),
+            "expectedBenchmarkPassesPerAverageMonthHigh": round(passes_high, 2),
+            "subscriptionUsdPerExpectedPassLow": round(price / passes_high, 6),
+            "subscriptionUsdPerExpectedPassHigh": round(price / passes_low, 6),
+            "subscriptionUsdPerExpectedPassCenter": round(price / ((passes_low + passes_high) / 2), 6),
+            "evidenceConfidenceFactor": round(evidence_factor, 3),
+            "evidenceAdjustedExpectedPassesPerAverageMonthLow": round(evidence_passes_low, 2),
+            "evidenceAdjustedSubscriptionUsdPerExpectedPassHigh": round(price / evidence_passes_low, 6),
+            "evidenceConfidence": plan["confidence"],
+            "calculationNote": "Counterfactual allocation of the eligible included API-equivalent pool to this exact native externally benchmarked route; shared-plan use and short-window limits can bind first.",
+        })
+
+# ---------------------------------------------------------------------------
+# Pareto frontiers with quality floors and conservative bounds
+# ---------------------------------------------------------------------------
+agent_rows = [b for b in benchmarks if b.get("benchmark") == "Artificial Analysis Coding Agent Index"]
+model_rows = [b for b in benchmarks if b.get("kind") == "model-intelligence"]
+model_price_rows = [b for b in model_rows if (b.get("blendedPricePerMUsd") or 0) > 0]
+
+for row in agent_rows:
+    row["costQualityPareto"] = False
+    row["timeQualityPareto"] = False
+    row["tokenQualityPareto"] = False
+for bid in pareto(agent_rows, maximize=("score",), minimize=("apiUsdPerExpectedPass",)):
+    benchmark_by_id.get(bid, next((x for x in agent_rows if x["id"] == bid), {}))["costQualityPareto"] = True
+for bid in pareto(agent_rows, maximize=("score",), minimize=("minutesPerExpectedPass",)):
+    next(x for x in agent_rows if x["id"] == bid)["timeQualityPareto"] = True
+for bid in pareto(agent_rows, maximize=("score",), minimize=("tokensPerExpectedPassM",)):
+    next(x for x in agent_rows if x["id"] == bid)["tokenQualityPareto"] = True
+for row in model_rows:
+    row["priceIntelligencePareto"] = False
+    row["speedIntelligencePareto"] = False
+for bid in pareto(model_price_rows, maximize=("score",), minimize=("blendedUsdPerIntelligencePoint",)):
+    next(x for x in model_rows if x["id"] == bid)["priceIntelligencePareto"] = True
+for bid in pareto(model_rows, maximize=("score", "outputTokensPerSecond"), minimize=()):
+    next(x for x in model_rows if x["id"] == bid)["speedIntelligencePareto"] = True
+
+QUALITY_FLOORS = {"elite": 65, "frontier": 60, "capable": 50, "volume": 30}
+subscription_frontiers: dict[str, list[str]] = {}
+subscription_budget_frontiers: dict[str, list[str]] = {}
+for band, floor in QUALITY_FLOORS.items():
+    eligible = [r for r in subscription_task_estimates if r["score"] >= floor]
+    # Throughput frontier: how much passing work the subscription can sustain at this quality floor.
+    subscription_frontiers[band] = pareto(
+        eligible,
+        maximize=("expectedBenchmarkPassesPerAverageMonthLow", "score"),
+        minimize=("subscriptionUsdPerExpectedPassHigh",),
+    )
+    # Budget frontier: preserves lower-priced plans even when a larger tier has a lower unit cost.
+    subscription_budget_frontiers[band] = pareto(
+        eligible,
+        maximize=("score",),
+        minimize=("priceMonthly", "subscriptionUsdPerExpectedPassHigh"),
+    )
+
+capacity_frontiers: dict[str, list[str]] = {}
+for floor in (30, 40, 50, 55, 60):
+    eligible = [
+        r for r in quality_routes
+        if r["rankingEligible"]
+        and (r.get("modelIntelligenceIndex") or 0) >= floor
+        and r.get("planValueMultipleLowerBound") is not None
+    ]
+    capacity_frontiers[str(floor)] = pareto(
+        eligible,
+        maximize=("modelIntelligenceIndex", "planValueMultipleLowerBound"),
+        minimize=("priceMonthly",),
+    )
+
+evidence_adjusted_frontiers: dict[str, list[str]] = {}
+official_only_frontiers: dict[str, list[str]] = {}
+for floor in (30, 40, 50, 55, 60):
+    evidence_rows = [
+        r for r in quality_routes
+        if r["rankingEligible"] and (r.get("modelIntelligenceIndex") or 0) >= floor
+        and r.get("evidenceAdjustedQualityCapacity") is not None
+    ]
+    evidence_adjusted_frontiers[str(floor)] = pareto(
+        evidence_rows,
+        maximize=("modelIntelligenceIndex", "evidenceAdjustedQualityCapacity"),
+        minimize=("priceMonthly",),
+    )
+    official_rows = [r for r in evidence_rows if

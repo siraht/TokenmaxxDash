@@ -1,0 +1,168 @@
+plan["lastVerified"] = max(plan.get("lastVerified", AS_OF), AS_OF)
+
+# ---------------------------------------------------------------------------
+# Model registry and route-level access semantics
+# ---------------------------------------------------------------------------
+model_benchmarks = [b for b in benchmarks if b.get("kind") == "model-intelligence"]
+agent_benchmarks = [b for b in benchmarks if b.get("benchmark") == "Artificial Analysis Coding Agent Index"]
+benchmark_by_id = {b["id"]: b for b in benchmarks}
+
+# Canonical advertised labels to direct external model evidence.
+MODEL_MATCH: dict[str, dict[str, Any]] = {
+    "Claude Opus 5": {"benchmarkId": "aa-model-claude-opus-5-max", "resolved": "Claude Opus 5 (max)", "confidence": "high"},
+    "Claude Fable 5": {"benchmarkId": "aa-model-claude-fable-5-max", "resolved": "Claude Fable 5 (max, with fallback)", "confidence": "high"},
+    "Claude Sonnet 5": {"benchmarkId": "aa-model-claude-sonnet-5-max", "resolved": "Claude Sonnet 5 (max)", "confidence": "high"},
+    "Claude Haiku 4.5": {"benchmarkId": "aa-model-claude-haiku-4-5-reasoning", "resolved": "Claude Haiku 4.5 (reasoning)", "confidence": "medium"},
+    "GPT-5.6 Sol": {"benchmarkId": "aa-model-gpt-5-6-sol-max", "resolved": "GPT-5.6 Sol (max)", "confidence": "high"},
+    "GPT-5.6 Sol (promo)": {"benchmarkId": "aa-model-gpt-5-6-sol-max", "resolved": "GPT-5.6 Sol (max)", "confidence": "medium", "routeNote": "Promotional access and exact effort/routing can differ from the direct OpenAI benchmark."},
+    "GPT-5.6 Terra": {"benchmarkId": "aa-model-gpt-5-6-terra-max", "resolved": "GPT-5.6 Terra (max)", "confidence": "high"},
+    "GPT-5.6 Luna": {"benchmarkId": "aa-model-gpt-5-6-luna-max", "resolved": "GPT-5.6 Luna (max)", "confidence": "high"},
+    "Kimi K3": {"benchmarkId": "aa-model-kimi-k3-max", "resolved": "Kimi K3 (max)", "confidence": "high"},
+    "Kimi K2.7 Code": {"benchmarkId": "aa-model-kimi-k2-7-code", "resolved": "Kimi K2.7 Code", "confidence": "high"},
+    "Kimi K2.6": {"benchmarkId": "aa-model-kimi-k2-6", "resolved": "Kimi K2.6", "confidence": "high", "routeNote": "The model is deprecated by the benchmark publisher; the plan may still expose it."},
+    "GLM-5.2": {"benchmarkId": "aa-model-glm-5-2-max", "resolved": "GLM-5.2 (max)", "confidence": "high"},
+    "MiMo V2.5 Pro": {"benchmarkId": "aa-model-mimo-v2-5-pro", "resolved": "MiMo V2.5 Pro", "confidence": "high"},
+    "MiMo V2.5": {"benchmarkId": "aa-model-mimo-v2-5", "resolved": "MiMo V2.5", "confidence": "medium"},
+    "MiniMax M3": {"benchmarkId": "aa-model-minimax-m3", "resolved": "MiniMax M3", "confidence": "high"},
+    "MiniMax M2.7": {"benchmarkId": "aa-model-minimax-m2-7", "resolved": "MiniMax M2.7", "confidence": "high", "routeNote": "The model is deprecated by the benchmark publisher; the plan may still expose it."},
+    "DeepSeek V4 Pro": {"benchmarkId": "aa-model-deepseek-v4-pro-max", "resolved": "DeepSeek V4 Pro (max)", "confidence": "high"},
+    "GLM-4.7": {"benchmarkId": "aa-model-glm-4-7-reasoning", "resolved": "GLM-4.7 (reasoning)", "confidence": "high", "routeNote": "The model is deprecated by the benchmark publisher."},
+    "GLM-5-Turbo": {"benchmarkId": "aa-model-glm-5-turbo", "resolved": "GLM-5-Turbo", "confidence": "medium", "routeNote": "Intelligence is publisher-estimated; token price is unavailable."},
+    "Qwen3.5 Flash": {"benchmarkId": "aa-model-qwen3-5-omni-flash", "resolved": "Qwen3.5 Omni Flash", "confidence": "low", "routeNote": "The plan label omits Omni; checkpoint identity must be verified before treating this as exact."},
+    "Qwen3.7 Plus": {"benchmarkId": "aa-model-qwen3-7-plus", "resolved": "Qwen3.7 Plus", "confidence": "high"},
+    "Qwen3.7 Max": {"benchmarkId": "aa-model-qwen3-7-max", "resolved": "Qwen3.7 Max", "confidence": "high"},
+    "Qwen3.8 Max": {"benchmarkId": "secondary-model-qwen3-8-max", "resolved": "Qwen3.8 Max", "confidence": "medium", "routeNote": "Benchmark value currently comes from a secondary snapshot pending direct publisher capture."},
+    "Hy3": {"benchmarkId": "aa-model-hy3", "resolved": "Hy3", "confidence": "high"},
+    "Gemma 31B": {"benchmarkId": "aa-model-gemma-4-31b", "resolved": "Gemma 4 31B", "confidence": "medium", "routeNote": "The plan label omits the Gemma generation; transfer is provisional."},
+    "Grok 4.5": {"benchmarkId": "aa-model-grok-4-5-high", "resolved": "Grok 4.5 (high)", "confidence": "high"},
+    "Cursor Grok 4.5": {"benchmarkId": "aa-model-grok-4-5-high", "resolved": "Grok 4.5 (high)", "confidence": "medium", "routeNote": "Model benchmark only; Cursor routing and agent harness are not the Grok Build benchmark."},
+    "Step 3.7 Flash": {"benchmarkId": "aa-model-step-3-7-flash", "resolved": "Step 3.7 Flash", "confidence": "high"},
+    "Step 3.5 Flash": {"benchmarkId": "aa-stepfun-step-3-5-flash", "resolved": "Step 3.5 Flash", "confidence": "medium"},
+    "Step 3.5 Flash 2603": {"benchmarkId": "aa-stepfun-step-3-5-flash-2603", "resolved": "Step 3.5 Flash 2603", "confidence": "medium"},
+    "Qwen3.6 Plus": {"benchmarkId": "aa-model-qwen3-6-plus", "resolved": "Qwen3.6 Plus", "confidence": "high"},
+    "DeepSeek V4 Flash": {"benchmarkId": "aa-model-deepseek-v4-flash-0731-max", "resolved": "DeepSeek V4 Flash 0731 (max)", "confidence": "low", "routeNote": "Provider alias must be confirmed to resolve to checkpoint 0731 before score transfer is treated as direct."},
+    "DeepSeek V4 Flash off-peak": {"benchmarkId": "aa-model-deepseek-v4-flash-0731-max", "resolved": "DeepSeek V4 Flash 0731 (max)", "confidence": "low", "routeNote": "Off-peak route/checkpoint is unverified."},
+    "Composer 2.5": {"agentBenchmarkId": "aa-agent-cursor-composer-2-5", "resolved": "Composer 2.5", "confidence": "high"},
+}
+
+NATIVE_AGENT = {
+    "claude-code": "Claude Code",
+    "openai-codex": "Codex",
+    "cursor": "Cursor",
+    "kimi-code": "Kimi Code CLI",
+    "supergrok": "Grok Build",
+    "grok-build": "Grok Build",
+    "opencode-go": "OpenCode",
+}
+
+# Native benchmark aliases: exact route label -> benchmark model prefix/IDs.
+NATIVE_ROUTE_BENCHMARKS: dict[tuple[str, str], list[str]] = {
+    ("claude-code", "Claude Opus 5"): [
+        "aa-agent-claude-code-opus-5-xhigh", "aa-agent-claude-code-opus-5-max",
+        "aa-agent-claude-code-opus-5-high", "aa-agent-claude-code-opus-5-medium",
+        "aa-agent-claude-code-opus-5-low",
+    ],
+    ("claude-code", "Claude Fable 5"): ["aa-agent-claude-code-fable-5-max-fallback"],
+    ("openai-codex", "GPT-5.6 Sol"): [
+        "aa-agent-codex-gpt-5-6-sol-max", "aa-agent-codex-gpt-5-6-sol-xhigh",
+        "aa-agent-codex-gpt-5-6-sol-high", "aa-agent-codex-gpt-5-6-sol-medium",
+    ],
+    ("openai-codex", "GPT-5.6 Terra"): [
+        "aa-agent-codex-gpt-5-6-terra-max", "aa-agent-codex-gpt-5-6-terra-xhigh",
+        "aa-agent-codex-gpt-5-6-terra-high", "aa-agent-codex-gpt-5-6-terra-low",
+        "aa-agent-codex-gpt-5-6-terra-none",
+    ],
+    ("openai-codex", "GPT-5.6 Luna"): [
+        "aa-agent-codex-gpt-5-6-luna-max", "aa-agent-codex-gpt-5-6-luna-xhigh",
+        "aa-agent-codex-gpt-5-6-luna-low", "aa-agent-codex-gpt-5-6-luna-none",
+    ],
+    ("kimi-code", "Kimi K3"): ["aa-agent-kimi-code-cli-kimi-k3"],
+    ("cursor", "Composer 2.5"): ["aa-agent-cursor-composer-2-5", "aa-agent-cursor-composer-2-5-fast"],
+    ("cursor", "frontier third-party models"): ["aa-agent-cursor-gpt-5-5-medium", "aa-agent-cursor-opus-4-7-medium"],
+}
+
+# Access overrides. All other concrete plan labels are catalog-advertised and assumed included only
+# when the plan itself says model access is part of the allowance.
+def route_access(plan: dict[str, Any], label: str) -> tuple[str, bool, float]:
+    if plan["providerId"] == "claude-code" and label == "Claude Fable 5":
+        if plan["id"] == "claude-code-pro":
+            return "payg-only", False, 0.0
+        return "included-capped", True, 0.5
+    if plan["status"] != "active":
+        return "historical", False, 0.0
+    if any(term in label.lower() for term in ("catalog", "family", "other hosted", "frontier third-party")):
+        return "catalog-advertised", True, 1.0
+    return "included", True, 1.0
+
+# First pass: model registry keyed by advertised label, preserving every route label.
+labels: dict[str, list[str]] = {}
+for plan in plans:
+    for label in plan.get("models", []):
+        labels.setdefault(label, []).append(plan["id"])
+
+models: list[dict[str, Any]] = []
+for label, plan_ids in sorted(labels.items()):
+    match = MODEL_MATCH.get(label, {})
+    model_row = benchmark_by_id.get(match.get("benchmarkId")) if match.get("benchmarkId") else None
+    direct_agent_ids = sorted({
+        bid for plan_id in plan_ids
+        for bid in NATIVE_ROUTE_BENCHMARKS.get((next(p for p in plans if p["id"] == plan_id)["providerId"], label), [])
+        if bid in benchmark_by_id
+    })
+    direct_model_ids = [match["benchmarkId"]] if model_row else []
+    if direct_model_ids and direct_agent_ids:
+        coverage = "direct-agent-and-model"
+    elif direct_model_ids:
+        coverage = "direct-model"
+    elif direct_agent_ids or match.get("agentBenchmarkId"):
+        coverage = "direct-agent"
+    elif any(term in label.lower() for term in ("catalog", "family", "other", "frontier third-party")):
+        coverage = "catalog-only"
+    else:
+        coverage = "no-external-benchmark"
+    agent_rows = [benchmark_by_id[x] for x in direct_agent_ids if x in benchmark_by_id]
+    if match.get("agentBenchmarkId") in benchmark_by_id:
+        agent_rows.append(benchmark_by_id[match["agentBenchmarkId"]])
+        direct_agent_ids = sorted(set(direct_agent_ids + [match["agentBenchmarkId"]]))
+    best_agent = max(agent_rows, key=lambda r: r["score"]) if agent_rows else None
+    exclusion = None
+    if coverage == "catalog-only":
+        exclusion = "Broad catalog/family label has no stable checkpoint to benchmark."
+    elif coverage == "no-external-benchmark":
+        exclusion = "No exact external model or native-agent benchmark match is currently attached."
+    models.append({
+        "id": f"model-{slug(label)}",
+        "name": label,
+        "planIds": sorted(plan_ids),
+        "planCount": len(plan_ids),
+        "resolvedModelVersion": match.get("resolved"),
+        "routeVersionConfidence": match.get("confidence"),
+        "routeNote": match.get("routeNote"),
+        "benchmarkCoverage": coverage,
+        "directModelBenchmarkIds": direct_model_ids,
+        "directAgentBenchmarkIds": direct_agent_ids,
+        "bestModelIntelligenceScore": model_row.get("score") if model_row else None,
+        "bestModelBlendedPricePerMUsd": model_row.get("blendedPricePerMUsd") if model_row else None,
+        "blendedUsdPerIntelligencePoint": model_row.get("blendedUsdPerIntelligencePoint") if model_row else None,
+        "bestModelOutputTokensPerSecond": model_row.get("outputTokensPerSecond") if model_row else None,
+        "bestCodingAgentScore": best_agent.get("score") if best_agent else None,
+        "bestCodingAgentCostPerTaskUsd": best_agent.get("apiCostPerTaskUsd") if best_agent else None,
+        "rankingEligible": bool(direct_model_ids or direct_agent_ids),
+        "exclusionReason": exclusion,
+    })
+model_by_label = {m["name"]: m for m in models}
+
+# Attach model coverage IDs back to each plan.
+for plan in plans:
+    plan["modelCoverageIds"] = [model_by_label[label]["id"] for label in plan.get("models", []) if label in model_by_label]
+    coverages = [model_by_label[label]["benchmarkCoverage"] for label in plan.get("models", []) if label in model_by_label]
+    if any(c == "direct-agent-and-model" for c in coverages):
+        plan["benchmarkCoverage"] = "direct-agent-and-model"
+    elif any(c == "direct-agent" for c in coverages):
+        plan["benchmarkCoverage"] = "direct-agent"
+    elif any(c == "direct-model" for c in coverages):
+        plan["benchmarkCoverage"] = "direct-model"
+    elif any(c == "catalog-only" for c in coverages):
+        plan["benchmarkCoverage"] = "catalog-only"
+    else:
+        plan["benchmarkCoverag

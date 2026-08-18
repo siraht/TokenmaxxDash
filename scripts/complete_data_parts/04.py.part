@@ -1,0 +1,205 @@
+cePerMUsd"] / row["score"], 8)
+        MODEL_ROWS.append(row)
+benchmarks.extend(MODEL_ROWS)
+benchmarks.extend([
+    terminal_benchmark(id="terminal-bench-2-1-claude-code-fable-5-xhigh", agent="Claude Code", model="Fable 5", effort="xhigh",
+                       score=83.8, error=1.2, total_cost=552.67, source_id="terminal-bench-2-1", date="2026-06-07"),
+    terminal_benchmark(id="terminal-bench-2-1-codex-gpt-5-5-xhigh", agent="Codex", model="GPT-5.5", effort="xhigh",
+                       score=83.1, error=1.1, total_cost=2059.19, source_id="terminal-bench-2-1", date="2026-05-01"),
+    terminal_benchmark(id="terminal-bench-2-1-terminus-fable-5-high", agent="Terminus 2", model="Fable 5", effort="high",
+                       score=80.4, error=1.2, total_cost=438.64, source_id="terminal-bench-2-1", date="2026-06-05"),
+])
+
+# ---------------------------------------------------------------------------
+# Claude hidden-pool inference
+# ---------------------------------------------------------------------------
+CLAUDE_API_RATES = {
+    # Current public API rates as of 2026-08-18. Sonnet 5 uses the published
+    # promotional rate through 2026-08-31; the source record carries the
+    # effective-date caveat so a refresh can version this row on 2026-09-01.
+    "Claude Opus 5": {
+        "uncachedInput": 5.0, "cacheRead": 0.5, "cacheWrite5m": 6.25,
+        "cacheWrite1h": 10.0, "output": 25.0,
+    },
+    "Claude Fable 5": {
+        "uncachedInput": 10.0, "cacheRead": 1.0, "cacheWrite5m": 12.5,
+        "cacheWrite1h": 20.0, "output": 50.0,
+    },
+    "Claude Sonnet 5": {
+        "uncachedInput": 2.0, "cacheRead": 0.2, "cacheWrite5m": 2.5,
+        "cacheWrite1h": 4.0, "output": 10.0,
+    },
+    "Claude Haiku 4.5": {
+        "uncachedInput": 1.0, "cacheRead": 0.1, "cacheWrite5m": 1.25,
+        "cacheWrite1h": 2.0, "output": 5.0,
+    },
+}
+
+CLAUDE_RANGE = {
+    "claude-code-pro": {
+        "weeklyRawB": (0.20, 0.28), "weeklyRawCenterB": 0.25,
+        "weeklyApiUsd": (120.4, 271.45), "measurementTier": "scaled-from-Max-5x",
+    },
+    "claude-code-max-5x": {
+        "weeklyRawB": (1.0, 1.4), "weeklyRawCenterB": 1.25,
+        "weeklyApiUsd": (602.0, 1357.25), "measurementTier": "direct-Max-5x-plus-Max-20x-scaling",
+    },
+    "claude-code-max-20x": {
+        "weeklyRawB": (4.0, 5.6), "weeklyRawCenterB": 5.0,
+        "weeklyApiUsd": (2408.0, 5429.0), "measurementTier": "direct-and-scaled-Max-20x",
+    },
+}
+
+for plan in plans:
+    plan.setdefault("bindingUnknowns", [])
+    if plan["id"] not in CLAUDE_RANGE:
+        continue
+    cfg = CLAUDE_RANGE[plan["id"]]
+    raw_low, raw_high = cfg["weeklyRawB"]
+    raw_center = cfg["weeklyRawCenterB"]
+    api_week_low, api_week_high = cfg["weeklyApiUsd"]
+    monthly_raw_low = raw_low * AVERAGE_WEEKS_PER_MONTH
+    monthly_raw_high = raw_high * AVERAGE_WEEKS_PER_MONTH
+    monthly_raw_center = raw_center * AVERAGE_WEEKS_PER_MONTH
+    api_month_low = api_week_low * AVERAGE_WEEKS_PER_MONTH
+    api_month_high = api_week_high * AVERAGE_WEEKS_PER_MONTH
+    price = plan["priceMonthly"]
+    cost_per_m_low = price / (monthly_raw_high * 1000)
+    cost_per_m_center = price / (monthly_raw_center * 1000)
+    cost_per_m_high = price / (monthly_raw_low * 1000)
+    multiple_low = api_month_low / price
+    multiple_high = api_month_high / price
+
+    model_category_estimates = []
+    for model_name, rates in CLAUDE_API_RATES.items():
+        if model_name == "Claude Fable 5":
+            access_mode = "payg-only" if plan["id"] == "claude-code-pro" else "included-capped"
+            allowance_fraction = 0.0 if plan["id"] == "claude-code-pro" else 0.5
+        else:
+            access_mode = "included"
+            allowance_fraction = 1.0
+        for category, api_rate in rates.items():
+            if allowance_fraction <= 0:
+                model_category_estimates.append({
+                    "model": model_name,
+                    "accessMode": access_mode,
+                    "allowanceShareMaxPct": 0,
+                    "tokenCategory": category,
+                    "apiRateUsdPerMillion": api_rate,
+                    "estimatedMonthlyTokensMillionLow": None,
+                    "estimatedMonthlyTokensMillionHigh": None,
+                    "subscriptionUsdPerMillionLow": None,
+                    "subscriptionUsdPerMillionHigh": None,
+                    "estimateStatus": "not-included",
+                })
+                continue
+            eligible_value_low = api_month_low * allowance_fraction
+            eligible_value_high = api_month_high * allowance_fraction
+            token_capacity_low_m = eligible_value_low / api_rate
+            token_capacity_high_m = eligible_value_high / api_rate
+            model_category_estimates.append({
+                "model": model_name,
+                "accessMode": access_mode,
+                "allowanceShareMaxPct": int(allowance_fraction * 100),
+                "tokenCategory": category,
+                "apiRateUsdPerMillion": api_rate,
+                "estimatedMonthlyTokensMillionLow": round(token_capacity_low_m, 2),
+                "estimatedMonthlyTokensMillionHigh": round(token_capacity_high_m, 2),
+                "subscriptionUsdPerMillionLow": round(price / token_capacity_high_m, 6),
+                "subscriptionUsdPerMillionHigh": round(price / token_capacity_low_m, 6),
+                "estimateStatus": "measured-api-equivalent-counterfactual",
+            })
+
+    plan.update({
+        "calculationStatus": "measured-range",
+        "confidence": "medium" if plan["id"] != "claude-code-pro" else "low",
+        "allowanceType": "measured mixed-token range over rolling 5h + weekly shared quota",
+        "headline": f"Estimated {raw_low:.2f}–{raw_high:.2f}B mixed raw tokens/week; full-utilization subscription cost ≈ ${cost_per_m_low:.4f}–${cost_per_m_high:.4f}/M raw tokens.",
+        "sourceIds": list(dict.fromkeys(plan.get("sourceIds", []) + [
+            "anthropic-claude-plans", "anthropic-claude-code-plan-use",
+            "anthropic-fable-plan-access", "anthropic-api-pricing",
+            "claude-max5-token-measurement-43118", "claude-max20-api-value-measurement-57699",
+        ])),
+        "valueMultiple": round((multiple_low + multiple_high) / 2, 3),
+        "valueMultipleLow": round(multiple_low, 3),
+        "valueMultipleHigh": round(multiple_high, 3),
+        # Conservative sort/ranking: use the lower measured API-equivalent boundary.
+        "sortValue": round(multiple_low, 3),
+        "includedValueUsdMonthly": round((api_month_low + api_month_high) / 2, 2),
+        "includedValueUsdMonthlyLow": round(api_month_low, 2),
+        "includedValueUsdMonthlyHigh": round(api_month_high, 2),
+        "formula": "raw-token range comes from ccusage/dashboard measurements; API-equivalent range = observed weekly API-value bounds × 365.2425/12/7; subscription $/M raw = monthly price ÷ monthly raw MTok",
+        "quotas": {
+            **plan.get("quotas", {}),
+            "weeklyRawTokensBillionLow": raw_low,
+            "weeklyRawTokensBillionCenter": raw_center,
+            "weeklyRawTokensBillionHigh": raw_high,
+            "averageMonthlyRawTokensBillionLow": round(monthly_raw_low, 6),
+            "averageMonthlyRawTokensBillionCenter": round(monthly_raw_center, 6),
+            "averageMonthlyRawTokensBillionHigh": round(monthly_raw_high, 6),
+            "weeklyApiEquivalentUsdLow": api_week_low,
+            "weeklyApiEquivalentUsdHigh": api_week_high,
+            "averageMonthlyApiEquivalentUsdLow": round(api_month_low, 2),
+            "averageMonthlyApiEquivalentUsdHigh": round(api_month_high, 2),
+            "subscriptionUsdPerMillionRawTokensLow": round(cost_per_m_low, 6),
+            "subscriptionUsdPerMillionRawTokensCenter": round(cost_per_m_center, 6),
+            "subscriptionUsdPerMillionRawTokensHigh": round(cost_per_m_high, 6),
+            "sharedAcrossClaudeAndCode": True,
+            "fiveHourNumericalPoolPublished": False,
+            "weeklyNumericalPoolPublished": False,
+        },
+        "models": ["Claude Opus 5", "Claude Fable 5", "Claude Sonnet 5", "Claude Haiku 4.5"],
+        "notes": [
+            "This is a measured range, not an Anthropic-published token allowance. Raw tokens are dominated by cached context reads and are model/mode/workload dependent.",
+            "The lower API-equivalent boundary is used in conservative rankings because issue telemetry shows weekly-accounting drift and changing cache-read treatment.",
+            "Claude and Claude Code share the same included limits; usage credits are separate PAYG billing and are excluded from the subscription allowance.",
+            "Fable 5 is included only on Max, can consume at most 50% of the shared weekly meter, and consumes that meter faster than other Claude models. Pro uses PAYG credits from the first Fable request.",
+        ],
+        "exactness": "measured-range",
+        "unit": "mixed raw token and API-equivalent USD range",
+        "planUnits": None,
+        "details": {
+            **plan.get("details", {}),
+            "measurementMethod": cfg["measurementTier"],
+            "rawTokenCostRange": [{
+                "lowUsdPerMillion": round(cost_per_m_low, 6),
+                "centerUsdPerMillion": round(cost_per_m_center, 6),
+                "highUsdPerMillion": round(cost_per_m_high, 6),
+            }],
+            "apiEquivalentValueRange": [{
+                "lowUsdPerAverageMonth": round(api_month_low, 2),
+                "highUsdPerAverageMonth": round(api_month_high, 2),
+                "lowMultiple": round(multiple_low, 3),
+                "highMultiple": round(multiple_high, 3),
+            }],
+            "modelCategoryTokenEconomics": model_category_estimates,
+            "modelCategoryEstimateMethod": [{
+                "formula": "eligible measured API-equivalent pool ÷ current model API category rate = category-only token capacity; subscription price ÷ capacity = effective subscription USD/M",
+                "interpretation": "Pure-category counterfactual, not an Anthropic-published quota and not a claim that the subscription meter equals API billing. Fable Max rows apply the official 50% shared-weekly-meter ceiling; Fable Pro is PAYG-only.",
+                "sonnet5PricingWindow": "Promotional API rates through 2026-08-31; refresh required on 2026-09-01.",
+            }],
+            "modelAccess": [
+                {"model": "Claude Opus 5", "accessMode": "included", "weeklyMeterShareMaxPct": 100},
+                {"model": "Claude Sonnet 5", "accessMode": "included", "weeklyMeterShareMaxPct": 100},
+                {"model": "Claude Haiku 4.5", "accessMode": "included", "weeklyMeterShareMaxPct": 100},
+                {"model": "Claude Fable 5", "accessMode": "payg-only" if plan["id"] == "claude-code-pro" else "included-capped", "weeklyMeterShareMaxPct": 0 if plan["id"] == "claude-code-pro" else 50},
+            ],
+        },
+        "lastVerified": AS_OF,
+        "valueDisplay": f"{multiple_low:.2f}–{multiple_high:.2f}× measured API-equivalent",
+    })
+    plan["bindingUnknowns"] = [
+        "Anthropic does not publish absolute five-hour or weekly token pools.",
+        "The model, effort, context, cache-read, and cache-write weighting used by the subscription meter is hidden and has changed over time.",
+        "Fable's meter multiplier is hidden, so its 50% meter ceiling cannot be translated into an exact raw-token allowance.",
+    ]
+
+# Ensure every plan uses the non-opaque statuses accepted by the current UI and has completed labels.
+for plan in plans:
+    if plan.get("calculationStatus") == "opaque":
+        plan["calculationStatus"] = "provider-hidden"
+        plan["valueDisplay"] = "Provider-hidden numerical pool"
+        plan.setdefault("bindingUnknowns", []).append("The provider has not published enough information to calculate a stable allowance denominator.")
+    if str(plan.get("valueDisplay", "")).lower() == "unresolved":
+        plan["valueDisplay"] = "Provider-hidden numerical pool"
+    

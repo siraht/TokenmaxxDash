@@ -1,0 +1,178 @@
+ r.get("officialOnlyAllowanceEvidence")]
+    official_only_frontiers[str(floor)] = pareto(
+        official_rows,
+        maximize=("modelIntelligenceIndex", "evidenceAdjustedQualityCapacity"),
+        minimize=("priceMonthly",),
+    )
+
+access_routes = [r for r in quality_routes if r["rankingEligible"] and r.get("modelIntelligenceIndex") is not None]
+# Default plan/value frontier now uses a meaningful quality floor and lower-bound capacity.
+default_capacity_routes = [r for r in access_routes if r["modelIntelligenceIndex"] >= 60 and r.get("planValueMultipleLowerBound") is not None]
+
+subscription_task_provider_frontiers: dict[str, dict[str, list[str]]] = {}
+for band, floor in QUALITY_FLOORS.items():
+    subscription_task_provider_frontiers[band] = {}
+    providers = sorted({r["provider"] for r in subscription_task_estimates if r["score"] >= floor})
+    for provider in providers:
+        provider_rows = [r for r in subscription_task_estimates if r["provider"] == provider and r["score"] >= floor]
+        subscription_task_provider_frontiers[band][provider] = pareto(
+            provider_rows,
+            maximize=("score", "evidenceAdjustedExpectedPassesPerAverageMonthLow"),
+            minimize=("priceMonthly", "evidenceAdjustedSubscriptionUsdPerExpectedPassHigh"),
+        )
+
+model_provider_frontiers: dict[str, list[str]] = {}
+for provider in sorted({r["provider"] for r in model_price_rows}):
+    provider_rows = [r for r in model_price_rows if r["provider"] == provider]
+    model_provider_frontiers[provider] = pareto(
+        provider_rows, maximize=("score", "outputTokensPerSecond"), minimize=("blendedUsdPerIntelligencePoint",)
+    )
+
+leaders = {
+    "method": "Pareto fronts are calculated on distinct, semantically compatible axes; raw subsidy is never blended into a single master score.",
+    "codingAgentCostQualityPareto": pareto(agent_rows, maximize=("score",), minimize=("apiUsdPerExpectedPass",)),
+    "codingAgentTimeQualityPareto": pareto(agent_rows, maximize=("score",), minimize=("minutesPerExpectedPass",)),
+    "codingAgentTokenQualityPareto": pareto(agent_rows, maximize=("score",), minimize=("tokensPerExpectedPassM",)),
+    "modelPriceIntelligencePareto": pareto(model_price_rows, maximize=("score",), minimize=("blendedUsdPerIntelligencePoint",)),
+    "modelSpeedIntelligencePareto": pareto(model_rows, maximize=("score", "outputTokensPerSecond"), minimize=()),
+    "planModelValueIntelligencePareto": pareto(default_capacity_routes, maximize=("modelIntelligenceIndex", "planValueMultipleLowerBound"), minimize=("priceMonthly",)),
+    "planAccessPriceIntelligencePareto": pareto(access_routes, maximize=("modelIntelligenceIndex",), minimize=("priceMonthly",)),
+    "subscriptionTaskParetoByQualityFloor": subscription_frontiers,
+    "subscriptionTaskBudgetParetoByQualityFloor": subscription_budget_frontiers,
+    "subscriptionTaskProviderParetoByQualityFloor": subscription_task_provider_frontiers,
+    "modelProviderPriceIntelligencePareto": model_provider_frontiers,
+    "confidenceAdjustedCapacityParetoByMinIntelligence": capacity_frontiers,
+    "evidenceAdjustedCapacityParetoByMinIntelligence": evidence_adjusted_frontiers,
+    "officialOnlyCapacityParetoByMinIntelligence": official_only_frontiers,
+    "rawSubsidyLeaders": [p["id"] for p in sorted(
+        [p for p in plans if p["status"] == "active" and p.get("sortValue") is not None],
+        key=lambda p: p["sortValue"], reverse=True
+    )[:20]],
+    "fableRelevantBenchmarkIds": [b["id"] for b in benchmarks if "fable" in (b.get("model", "") + b.get("id", "")).lower()],
+    "fableRelevantRouteIds": [r["id"] for r in quality_routes if "fable" in r["model"].lower()],
+    "subscriptionTaskEstimateCount": len(subscription_task_estimates),
+}
+
+# Current summary is evidence-first; no hardcoded universal winner.
+status_counts: dict[str, int] = {}
+for plan in plans:
+    status_counts[plan["calculationStatus"]] = status_counts.get(plan["calculationStatus"], 0) + 1
+coverage_counts: dict[str, int] = {}
+for model in models:
+    coverage_counts[model["benchmarkCoverage"]] = coverage_counts.get(model["benchmarkCoverage"], 0) + 1
+summary.update({
+    "asOf": AS_OF,
+    "planCount": len(plans),
+    "providerCount": len({p["providerId"] for p in plans}),
+    "externalBenchmarkRows": len(benchmarks),
+    "modelRouteCount": len(models),
+    "qualityRouteCount": len(quality_routes),
+    "subscriptionTaskEstimateCount": len(subscription_task_estimates),
+    "directBenchmarkModelRouteCount": sum(1 for m in models if m["rankingEligible"]),
+    "providerHiddenCount": status_counts.get("provider-hidden", 0),
+    "opaqueCount": 0,
+    "statusCounts": status_counts,
+    "benchmarkCoverageCounts": coverage_counts,
+    "fableBenchmarkRowCount": len(leaders["fableRelevantBenchmarkIds"]),
+    "fableSubscriptionRouteCount": len(leaders["fableRelevantRouteIds"]),
+    "defaultQualityFloor": 60,
+    "marketVerdict": "No universal winner: quality-floor, native-agent task economics, access price, latency, policy eligibility, and raw allowance have separate Pareto fronts.",
+})
+# Retain validator compatibility while clarifying their limited meaning.
+active_ranked = sorted([p for p in plans if p["status"] == "active" and p.get("sortValue") is not None], key=lambda p: p["sortValue"], reverse=True)
+if active_ranked:
+    top = active_ranked[0]
+    summary["topNormalizedValue"] = {
+        "planId": top["id"], "label": f"{top['provider']} {top['name']}", "multiple": top["sortValue"],
+        "qualification": "Raw conservative allowance multiple only; excluded from the default recommendation surface unless it also meets the selected intelligence floor.",
+    }
+measured_frontier = sorted(
+    [p for p in plans if p["status"] == "active" and p["calculationStatus"] == "measured-range" and p.get("sortValue") is not None],
+    key=lambda p: p["sortValue"], reverse=True,
+)
+if measured_frontier:
+    top = measured_frontier[0]
+    summary["topMeasuredFrontierSubsidy"] = {
+        "planId": top["id"], "label": f"{top['provider']} {top['name']}", "multiple": top["sortValue"],
+        "qualification": "Highest conservative lower-bound measured API-equivalent multiple in the current measured-range subset; not a universal quality-adjusted winner.",
+    }
+    summary["topMeasuredSubsidy"] = {
+        "planId": top["id"], "label": f"{top['provider']} {top['name']}", "multiple": top["sortValue"],
+        "qualification": "Backward-compatible alias for the strongest conservative lower-bound measured range. Use quality-floor and native task frontiers for recommendations.",
+    }
+
+# Candidates are explicit evidence gaps, not unresolved blank cells.
+candidates = [
+    {
+        "id": "candidate-claude-meter-weighting",
+        "provider": "Anthropic Claude Code",
+        "question": "What model/mode/token-category weights currently drive five-hour and weekly meters?",
+        "impact": "Would narrow Claude plan token and API-equivalent ranges and make Fable's 50% meter share numerically convertible.",
+        "status": "provider-hidden",
+        "nextEvidence": "Multiple clean windows with per-category ccusage logs and before/after meter snapshots.",
+    },
+    {
+        "id": "candidate-fable-meter-multiplier",
+        "provider": "Anthropic Claude Code",
+        "question": "How much faster does Fable 5 consume Max weekly limits than Opus/Sonnet under matched token mixes?",
+        "impact": "Needed for exact Fable raw-token capacity; current dashboard intentionally reports only the 50% meter ceiling.",
+        "status": "provider-hidden",
+        "nextEvidence": "Controlled matched prompts on Max with isolated Fable and Opus meter deltas.",
+    },
+    {
+        "id": "candidate-gateway-route-resolution",
+        "provider": "Multi-model gateways",
+        "question": "Which checkpoint, quantization, provider, and effort setting does each advertised alias resolve to?",
+        "impact": "Prevents model-only benchmark scores from being overstated as direct subscription-route performance.",
+        "status": "ongoing",
+        "nextEvidence": "Response model IDs, provider headers, changelogs, and repeatable fingerprint checks.",
+    },
+]
+
+# Stable ordering for readable diffs.
+plans.sort(key=lambda p: (p["provider"].lower(), p.get("priceMonthly") if p.get("priceMonthly") is not None else math.inf, p["name"].lower()))
+benchmarks.sort(key=lambda b: (b.get("kind", ""), b.get("benchmark", ""), -(b.get("score") or 0), b["id"]))
+models.sort(key=lambda m: (-(m.get("bestModelIntelligenceScore") or -1), m["name"].lower()))
+quality_routes.sort(key=lambda r: (r["provider"].lower(), r["plan"].lower(), r["model"].lower()))
+subscription_task_estimates.sort(key=lambda r: (r["subscriptionUsdPerExpectedPassHigh"], -r["score"], r["provider"]))
+sources.sort(key=lambda s: (s["publisher"].lower(), s["title"].lower()))
+
+write_json("plans.json", plans)
+write_json("benchmarks.json", benchmarks)
+write_json("sources.json", sources)
+write_json("models.json", models)
+write_json("quality-routes.json", quality_routes)
+write_json("subscription-task-estimates.json", subscription_task_estimates)
+write_json("leaders.json", leaders)
+write_json("candidates.json", candidates)
+methodology["asOf"] = AS_OF
+methodology["calculationStatuses"] = {
+    "exact": "Official numerical allowance and formula are sufficient for direct calculation.",
+    "derived": "Official formula plus a measured or officially illustrated hidden variable.",
+    "measured-range": "A numerical interval is inferred from externally observable logs or meter deltas; it is not an official quota.",
+    "partial": "Some arithmetic is exact, but at least one binding quota or pool remains hidden.",
+    "provider-hidden": "Price or mechanics are known, but the provider withholds the numerical pool needed for a defensible value estimate.",
+    "secondary": "Current calculation relies materially on a comparison tracker pending primary confirmation.",
+    "unverified-candidate": "Discovered product or tier awaiting primary-source verification.",
+    "legacy": "Historical plan retained for time-series comparison and excluded from current recommendations.",
+}
+write_json("methodology.json", methodology)
+write_json("summary.json", summary)
+
+print(json.dumps({
+    "plans": len(plans),
+    "benchmarks": len(benchmarks),
+    "models": len(models),
+    "qualityRoutes": len(quality_routes),
+    "taskEstimates": len(subscription_task_estimates),
+    "fableBenchmarkRows": summary["fableBenchmarkRowCount"],
+    "fableRoutes": summary["fableSubscriptionRouteCount"],
+    "claudePlans": [
+        {
+            "id": p["id"],
+            "value": p["valueDisplay"],
+            "rawUsdPerM": p.get("quotas", {}).get("subscriptionUsdPerMillionRawTokensCenter"),
+        }
+        for p in plans if p["providerId"] == "claude-code"
+    ],
+}, indent=2))

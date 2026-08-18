@@ -1,0 +1,139 @@
+g-grok-build",
+    ),
+    agent_benchmark(
+        id="aa-agent-grok-build-grok-4-5-high", agent="Grok Build", model="Grok 4.5 (high)",
+        score=64, cost=2.59, time=16.5, tokens=3.6, deep=60, terminal=85, atlas=48,
+        cache=93, turns=60.9, source_id="aa-coding-grok-build",
+    ),
+    agent_benchmark(
+        id="aa-agent-opencode-muse-spark-1-1-xhigh", agent="OpenCode", model="Muse Spark 1.1 (xhigh)",
+        score=54, cost=1.43, time=12.6, tokens=12.2, deep=54, terminal=73, atlas=33,
+        cache=95, turns=55.4, source_id="aa-coding-opencode",
+    ),
+    agent_benchmark(
+        id="aa-agent-opencode-opus-4-7-medium", agent="OpenCode", model="Opus 4.7 (medium)",
+        score=50, cost=2.93, time=12.2, tokens=7.6, deep=40, terminal=75, atlas=35,
+        source_id="aa-coding-opencode",
+    ),
+]:
+    upsert(benchmarks, row)
+
+# Update a few old rows to the current public comparison values.
+AGENT_UPDATES = {
+    "aa-agent-claude-code-fable-5-max-fallback": {"apiCostPerTaskUsd": 11.71, "model": "Fable 5 (max, with fallback)"},
+    "aa-agent-cursor-composer-2-5": {"apiCostPerTaskUsd": 0.08, "timePerTaskMinutes": 9.5, "tokensPerTaskM": 3.6},
+    "aa-agent-cursor-composer-2-5-fast": {"apiCostPerTaskUsd": 0.55, "timePerTaskMinutes": 6.8, "tokensPerTaskM": 4.2},
+}
+for row in benchmarks:
+    patch = AGENT_UPDATES.get(row["id"])
+    if patch:
+        row.update(patch)
+        pass_rate = row["score"] / 100
+        if row.get("apiCostPerTaskUsd") is not None:
+            row["apiUsdPerExpectedPass"] = round(row["apiCostPerTaskUsd"] / pass_rate, 6)
+            row["expectedPassesPerApiDollar"] = round(pass_rate / row["apiCostPerTaskUsd"], 6)
+        if row.get("timePerTaskMinutes") is not None:
+            row["minutesPerExpectedPass"] = round(row["timePerTaskMinutes"] / pass_rate, 6)
+        if row.get("tokensPerTaskM") is not None:
+            row["tokensPerExpectedPassM"] = round(row["tokensPerTaskM"] / pass_rate, 6)
+
+MODEL_ROWS = [
+    model_benchmark(id="aa-model-claude-opus-5-max", model="Claude Opus 5 (max)", provider="Anthropic", score=61,
+                    input_price=5, cache_price=.5, write_price=6.25, output_price=25, speed=53.6, context_k=1000,
+                    evaluation_cost=3835.51, effort="max", source_id="aa-claude-opus-5"),
+    model_benchmark(id="aa-model-claude-fable-5-max", model="Claude Fable 5 (max, with fallback)", provider="Anthropic", score=60,
+                    input_price=10, cache_price=1, write_price=12.5, output_price=50, speed=62.6, context_k=1000,
+                    evaluation_cost=5630.52, effort="max", source_id="aa-claude-fable-5",
+                    version_note="Artificial Analysis tested adaptive max effort with Opus 4.8 fallback."),
+    model_benchmark(id="aa-model-gpt-5-6-sol-max", model="GPT-5.6 Sol (max)", provider="OpenAI", score=59,
+                    input_price=5, cache_price=.5, write_price=6.25, output_price=30, speed=64.9, context_k=1000,
+                    evaluation_cost=3442.81, effort="max", source_id="aa-gpt-5-6-sol"),
+    model_benchmark(id="aa-model-kimi-k3-max", model="Kimi K3 (max)", provider="Kimi", score=57,
+                    input_price=3, cache_price=.3, output_price=15, speed=35.4, context_k=1000,
+                    effort="max", source_id="aa-kimi-k3"),
+    model_benchmark(id="aa-model-gpt-5-6-terra-max", model="GPT-5.6 Terra (max)", provider="OpenAI", score=55,
+                    input_price=2, cache_price=.2, write_price=2.5, output_price=12, speed=131.8, context_k=1000,
+                    evaluation_cost=1607.93, effort="max", source_id="aa-gpt-5-6-terra"),
+    model_benchmark(id="aa-model-grok-4-5-high", model="Grok 4.5 (high)", provider="SpaceXAI", score=54,
+                    input_price=2, cache_price=.5, output_price=6, speed=62.3, context_k=500,
+                    evaluation_cost=639.87, effort="high", source_id="aa-grok-4-5"),
+    model_benchmark(id="aa-model-claude-sonnet-5-max", model="Claude Sonnet 5 (max)", provider="Anthropic", score=53,
+                    input_price=2, cache_price=.2, write_price=2.5, output_price=10, speed=74.7, context_k=1000,
+                    evaluation_cost=4010.12, effort="max", source_id="aa-claude-sonnet-5",
+                    version_note="Promotional API pricing through 2026-08-31; scheduled prices rise to $3/$0.30/$15 on 2026-09-01."),
+    model_benchmark(id="aa-model-gpt-5-6-luna-max", model="GPT-5.6 Luna (max)", provider="OpenAI", score=51,
+                    input_price=.2, cache_price=.02, write_price=.25, output_price=1.2, speed=174.9, context_k=1000,
+                    evaluation_cost=190.87, effort="max", source_id="aa-gpt-5-6-luna"),
+    model_benchmark(id="aa-model-glm-5-2-max", model="GLM-5.2 (max)", provider="Z AI", score=51,
+                    input_price=1.4, cache_price=.26, output_price=4.4, speed=112.7, context_k=1000,
+                    evaluation_cost=710.15, effort="max", source_id="aa-glm-5-2"),
+    model_benchmark(id="aa-model-muse-spark-1-1-xhigh", model="Muse Spark 1.1 (xhigh)", provider="Meta", score=51,
+                    input_price=1.25, cache_price=.15, output_price=4.25, speed=130.0, context_k=1000,
+                    evaluation_cost=548.07, effort="xhigh", source_id="aa-muse-spark-1-1"),
+    model_benchmark(id="aa-model-deepseek-v4-flash-0731-max", model="DeepSeek V4 Flash 0731 (max)", provider="DeepSeek", score=50,
+                    input_price=.14, cache_price=.003, output_price=.28, speed=None, context_k=1000,
+                    evaluation_cost=72.02, effort="max", source_id="aa-deepseek-v4-flash-0731",
+                    version_note="Only transfer to a subscription route when its V4 Flash alias is confirmed to resolve to checkpoint 0731."),
+    model_benchmark(id="aa-model-deepseek-v4-pro-max", model="DeepSeek V4 Pro (max)", provider="DeepSeek", score=44,
+                    input_price=.435, cache_price=.004, output_price=.87, speed=64.8, context_k=1000,
+                    evaluation_cost=176.34, effort="max", source_id="aa-deepseek-v4-pro"),
+    model_benchmark(id="aa-model-kimi-k2-6", model="Kimi K2.6", provider="Kimi", score=44,
+                    input_price=.95, cache_price=.16, output_price=4, speed=40.2, context_k=256,
+                    evaluation_cost=840.64, source_id="aa-kimi-k2-6", version_note="Deprecated by the benchmark publisher after Kimi K3 release."),
+    model_benchmark(id="aa-model-kimi-k2-7-code", model="Kimi K2.7 Code", provider="Kimi", score=42,
+                    input_price=.95, cache_price=.19, output_price=4, speed=49.5, context_k=256,
+                    evaluation_cost=544.15, source_id="aa-kimi-k2-7-code"),
+    model_benchmark(id="aa-model-qwen3-7-plus", model="Qwen3.7 Plus", provider="Alibaba", score=39,
+                    input_price=.4, cache_price=.04, output_price=1.6, speed=56.5, context_k=1000,
+                    evaluation_cost=322.40, source_id="aa-qwen3-7-plus"),
+    model_benchmark(id="aa-model-minimax-m2-7", model="MiniMax M2.7", provider="MiniMax", score=38,
+                    input_price=.3, cache_price=.06, write_price=.375, output_price=1.2, speed=61.6, context_k=205,
+                    source_id="aa-minimax-m2-7", version_note="Deprecated by the benchmark publisher after MiniMax M3 release."),
+    model_benchmark(id="aa-model-glm-5-turbo", model="GLM-5-Turbo", provider="Z AI", score=38,
+                    input_price=None, cache_price=None, output_price=None, speed=None, context_k=200,
+                    source_id="aa-glm-5-turbo", version_note="Publisher-estimated score; public API provider pricing unavailable and model is deprecated. Excluded from price Pareto fronts."),
+    model_benchmark(id="aa-model-glm-4-7-reasoning", model="GLM-4.7 (reasoning)", provider="Z AI", score=34,
+                    input_price=.6, cache_price=.6, output_price=2.2, speed=99.9, context_k=200,
+                    evaluation_cost=603.03, source_id="aa-glm-4-7", version_note="Deprecated by the benchmark publisher after GLM-5 release."),
+    model_benchmark(id="aa-model-qwen3-5-omni-flash", model="Qwen3.5 Omni Flash", provider="Alibaba", score=19,
+                    input_price=.1, cache_price=.1, output_price=.8, speed=238.6, context_k=256,
+                    source_id="aa-qwen3-5-omni-flash", version_note="Artificial Analysis marks this Intelligence Index value as estimated."),
+    model_benchmark(id="aa-model-gemma-4-31b", model="Gemma 4 31B", provider="Google", score=39,
+                    input_price=None, cache_price=None, output_price=None, speed=None, context_k=None,
+                    source_id="aa-gemma-4-31b", version_note="Intelligence-only row from publisher article; no comparable first-party token price attached, so excluded from price frontiers."),
+    model_benchmark(id="aa-model-hy3", model="Hy3", provider="Tencent", score=42,
+                    input_price=.136, cache_price=.034, output_price=.554, speed=67.0, context_k=256,
+                    evaluation_cost=93.20, source_id="aa-hy3"),
+    model_benchmark(id="aa-model-qwen3-7-max", model="Qwen3.7 Max", provider="Alibaba", score=46,
+                    input_price=2.5, cache_price=.25, write_price=3.125, output_price=7.5, speed=202.1, context_k=1000,
+                    evaluation_cost=1604.13, source_id="aa-qwen3-7-max"),
+    model_benchmark(id="secondary-model-qwen3-8-max", model="Qwen3.8 Max", provider="Alibaba", score=53.4,
+                    input_price=2, cache_price=None, output_price=6, speed=None, context_k=1000,
+                    source_id="secondary-qwen3-8-max", version_note="Secondary snapshot attributing Artificial Analysis; cache price and direct source snapshot were unavailable, so excluded from price Pareto."),
+    model_benchmark(id="aa-model-minimax-m3", model="MiniMax M3", provider="MiniMax", score=44,
+                    input_price=.3, cache_price=.06, write_price=.375, output_price=1.2, speed=77.2, context_k=1000,
+                    evaluation_cost=203.86, source_id="aa-minimax-m3"),
+    model_benchmark(id="aa-model-mimo-v2-5-pro", model="MiMo V2.5 Pro", provider="Xiaomi", score=42,
+                    input_price=.435, cache_price=.004, output_price=.87, speed=50.0, context_k=1000,
+                    evaluation_cost=107.98, source_id="aa-mimo-v2-5-pro"),
+    model_benchmark(id="aa-model-claude-sonnet-5-nonreasoning", model="Claude Sonnet 5 (non-reasoning)", provider="Anthropic", score=42,
+                    input_price=2, cache_price=.2, write_price=2.5, output_price=10, speed=64.7, context_k=1000,
+                    evaluation_cost=427.33, effort="non-reasoning", source_id="aa-claude-sonnet-5"),
+    model_benchmark(id="aa-model-qwen3-6-plus", model="Qwen3.6 Plus", provider="Alibaba", score=40,
+                    input_price=.5, cache_price=.05, write_price=.625, output_price=3, speed=53.6, context_k=1000,
+                    evaluation_cost=525.58, source_id="aa-qwen-3-6-plus"),
+    model_benchmark(id="aa-model-claude-haiku-4-5-reasoning", model="Claude Haiku 4.5 (reasoning)", provider="Anthropic", score=30,
+                    input_price=1, cache_price=.1, write_price=1.25, output_price=5, speed=95.4, context_k=200,
+                    evaluation_cost=538.77, source_id="aa-claude-haiku-4-5"),
+    model_benchmark(id="aa-model-step-3-7-flash", model="Step 3.7 Flash", provider="StepFun", score=30,
+                    input_price=.2, cache_price=.04, output_price=1.15, speed=393.3, context_k=262,
+                    evaluation_cost=319.49, source_id="aa-step-3-7-flash"),
+]
+# Retain old directly benchmarked lower Step and MiMo variants, but mark their snapshot date.
+for row in base_benchmarks:
+    if row.get("kind") == "model-intelligence" and row.get("id") in {
+        "aa-stepfun-step-3-5-flash-2603", "aa-stepfun-step-3-5-flash", "aa-model-mimo-v2-5"
+    }:
+        row["retrievedAt"] = row.get("retrievedAt", "2026-08-17")
+        if row.get("score") and row.get("blendedPricePerMUsd"):
+            row["blendedUsdPerIntelligencePoint"] = round(row["blendedPri
