@@ -1,0 +1,42 @@
+    write_page("/plans/", layout("Plans", body, "/plans/"))
+
+
+def build_plan_details() -> None:
+    model_by_id = {row["id"]: row for row in models}
+    agent_map = {"openai-codex": "Codex", "claude-code": "Claude Code", "cursor": "Cursor", "kimi-code": "Kimi Code CLI"}
+    for plan in plans:
+        attached_sources = [source_map[source_id] for source_id in plan.get("sourceIds", []) if source_id in source_map]
+        source_links = "".join(f'<a class="source-link" href="{e(source["url"])}" target="_blank" rel="noreferrer"><strong>{e(source["title"])}</strong><span>{e(source["publisher"])} · {e(source["type"])}</span></a>' for source in attached_sources)
+        formula = f'<pre class="formula"><code>{e(plan["formula"])}</code></pre>' if plan.get("formula") else '<div class="callout warning"><strong>Provider-hidden denominator.</strong> The price or mechanics are known, but the binding numerical pool is not published, so no value multiple is inferred.</div>'
+        unknowns = plan.get("bindingUnknowns") or []
+        unknown_panel = ""
+        if unknowns:
+            unknown_panel = f'<section class="panel"><div class="panel-header"><div><h3>Binding unknowns</h3><p>Known gaps that prevent stronger normalization.</p></div></div><div class="panel-body"><ul class="note-list">{"".join(f"<li>{e(item)}</li>" for item in unknowns)}</ul></div></section>'
+        quota_panel = ""
+        if plan.get("quotas"):
+            quota_rows = "".join(f'<div class="definition"><dt>{e(key_title(key))}</dt><dd>{e(fmt(value))}</dd></div>' for key, value in plan["quotas"].items())
+            quota_panel = f'<section class="panel"><div class="panel-header"><div><h3>Quota buckets</h3><p>Every applicable rolling or monthly bucket can become binding.</p></div></div><div class="panel-body"><dl class="definition-grid">{quota_rows}</dl></div></section>'
+        details_panel = ""
+        if plan.get("details"):
+            details_panel = f'<section class="panel"><div class="panel-header"><div><h3>Plan-specific details</h3><p>Rates, estimates and provider mechanics retained as structured evidence.</p></div></div><div class="panel-body"><pre class="formula">{e(json.dumps(plan["details"], ensure_ascii=False, indent=2))}</pre></div></section>'
+        plan_models = [model_by_id[row_id] for row_id in plan.get("modelCoverageIds", []) if row_id in model_by_id]
+        model_panel = ""
+        if plan_models:
+            model_rows = "".join(f'<tr><td><strong>{e(row["name"])}</strong></td><td>{e(row["benchmarkCoverage"])}</td><td class="numeric">{fmt(row.get("bestModelIntelligenceScore"))}</td><td class="numeric">{"$"+fmt(row.get("bestModelBlendedPricePerMUsd"),3) if row.get("bestModelBlendedPricePerMUsd") is not None else "—"}</td><td class="numeric">{"$"+fmt(row.get("blendedUsdPerIntelligencePoint"),5) if row.get("blendedUsdPerIntelligencePoint") is not None else "—"}</td></tr>' for row in plan_models)
+            model_panel = f'<section class="panel"><div class="panel-header"><div><h3>Advertised model quality coverage</h3><p>Only direct external matches receive scores.</p></div><a href="/models/">All models</a></div><div class="table-shell"><table><thead><tr><th>Model route</th><th>Coverage</th><th>Intelligence</th><th>Blended $/M</th><th>$/M/intelligence point</th></tr></thead><tbody>{model_rows}</tbody></table></div></section>'
+        task_rows_for_plan = sorted([row for row in subscription_task_estimates if row["planId"] == plan["id"]], key=lambda row: row.get("subscriptionUsdPerExpectedPass") or math.inf)[:8]
+        task_panel = ""
+        if task_rows_for_plan:
+            task_rows = "".join(f'<tr><td><strong>{e(row["model"])}</strong></td><td class="numeric">{fmt(row["score"])}</td><td class="numeric">{fmt(row["expectedBenchmarkPassesPerAverageMonth"])}</td><td class="numeric">${fmt(row.get("subscriptionUsdPerExpectedPass"),4)}</td></tr>' for row in task_rows_for_plan)
+            task_panel = f'<section class="panel"><div class="panel-header"><div><h3>Direct subscription task estimates</h3><p>Measured plan pool joined to a native external benchmark route.</p></div><a href="/leaders/">Pareto leaders</a></div><div class="table-shell"><table><thead><tr><th>Model</th><th>Index</th><th>Expected passes/month</th><th>Subscription $/expected pass</th></tr></thead><tbody>{task_rows}</tbody></table></div></section>'
+        agent = agent_map.get(plan.get("providerId"))
+        agent_rows = [row for row in benchmarks if row.get("agent") == agent and row.get("benchmark") == "Artificial Analysis Coding Agent Index"][:8] if agent else []
+        benchmark_panel = ""
+        if agent_rows:
+            benchmark_html = "".join(f'<tr><td><strong>{e(row["model"])}</strong></td><td class="numeric">{fmt(row["score"])}</td><td class="numeric">{"$"+fmt(row.get("apiCostPerTaskUsd"),2) if row.get("apiCostPerTaskUsd") is not None else "—"}</td><td class="numeric">{"$"+fmt(row.get("apiUsdPerExpectedPass"),3) if row.get("apiUsdPerExpectedPass") is not None else "—"}</td><td>{"<span class=\"pareto-chip\">cost</span>" if row.get("costQualityPareto") else ""}</td></tr>' for row in agent_rows)
+            benchmark_panel = f'<section class="panel"><div class="panel-header"><div><h3>External benchmark rows for this agent</h3><p>Publisher API-cost counterfactuals, not subscription billing records.</p></div><a href="/benchmarks/">All benchmarks</a></div><div class="table-shell"><table><thead><tr><th>Model</th><th>Index</th><th>API cost/task</th><th>API $/expected pass</th><th>Pareto</th></tr></thead><tbody>{benchmark_html}</tbody></table></div></section>'
+        notes = plan.get("notes") or []
+        notes_panel = f'<section class="panel"><div class="panel-header"><h3>Interpretation</h3></div><div class="panel-body"><ul class="note-list">{"".join(f"<li>{e(note)}</li>" for note in notes)}</ul></div></section>' if notes else ""
+        tag_panel = f'<section class="panel"><div class="panel-header"><h3>Models or catalog</h3></div><div class="panel-body"><div class="tag-list">{"".join(f"<span class=\"tag\">{e(model)}</span>" for model in plan.get("models", []))}</div></div></section>' if plan.get("models") else ""
+        represented = f'${fmt(plan["includedValueUsdMonthly"])} per average month' if plan.get("includedValueUsdMonthly") is not None else (plan.get("planDenominator") or "Provider-hidden")
+        body = f'''<section class="detail-hero"><div><p class="provider">{e(plan['provider'])}</p><h1>{e(plan['name'])}</h1><p class="lede">{e(plan['headline'])}</p><div class="meta-row">{badge(plan['calculationStatus'])}{badge(plan['confidence'], plan['confidence']+' confidence')}<span class="badge status">{e(plan['allowanceType'])}</span><span class="badge status">{e(plan['region'])}</span></div></div><div class="detail-price"><strong>{e(plan['priceDisplay'])}</strong><span>{e(plan['valueDisplay'])}</span></div></section>

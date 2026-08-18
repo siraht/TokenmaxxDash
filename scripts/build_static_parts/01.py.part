@@ -1,0 +1,120 @@
+from __future__ import annotations
+
+import html
+import json
+import math
+import shutil
+from pathlib import Path
+from typing import Any
+
+ROOT = Path(__file__).resolve().parents[1]
+DIST = ROOT / "dist"
+DATA = ROOT / "src" / "data"
+PUBLIC = ROOT / "public"
+
+plans = json.loads((DATA / "plans.json").read_text())
+benchmarks = json.loads((DATA / "benchmarks.json").read_text())
+sources = json.loads((DATA / "sources.json").read_text())
+summary = json.loads((DATA / "summary.json").read_text())
+methodology = json.loads((DATA / "methodology.json").read_text())
+models = json.loads((DATA / "models.json").read_text())
+leaders = json.loads((DATA / "leaders.json").read_text())
+quality_routes = json.loads((DATA / "quality-routes.json").read_text())
+subscription_task_estimates = json.loads((DATA / "subscription-task-estimates.json").read_text())
+source_map = {source["id"]: source for source in sources}
+
+
+def e(value: Any) -> str:
+    return html.escape(str(value), quote=True)
+
+
+def fmt(value: Any, digits: int = 2) -> str:
+    if value is None:
+        return "—"
+    if isinstance(value, bool):
+        return "Yes" if value else "No"
+    if isinstance(value, (int, float)):
+        if isinstance(value, int) or float(value).is_integer():
+            return f"{int(value):,}"
+        return f"{value:,.{digits}f}".rstrip("0").rstrip(".")
+    if isinstance(value, list):
+        return " – ".join(fmt(item, digits) for item in value)
+    if isinstance(value, dict):
+        return json.dumps(value, ensure_ascii=False)
+    return str(value)
+
+
+def key_title(value: str) -> str:
+    out = []
+    for i, char in enumerate(value):
+        if i and char.isupper() and value[i-1].islower():
+            out.append(" ")
+        out.append(char)
+    return "".join(out).replace("Usd", "USD").replace("Api", "API").replace("Mcp", "MCP").title().replace("Usd", "USD").replace("Api", "API").replace("Mcp", "MCP")
+
+
+def badge(status: str, text: str | None = None) -> str:
+    label = text or {
+        "exact": "Official exact", "derived": "Evidence-derived", "measured-range": "Measured range",
+        "partial": "Partially normalized", "provider-hidden": "Provider-hidden",
+        "secondary": "Secondary-source", "unverified-candidate": "Unverified candidate", "legacy": "Legacy"
+    }.get(status, status)
+    return f'<span class="badge {e(status)}">{e(label)}</span>'
+
+
+def nav(path: str) -> str:
+    links = [
+        ("/", "Overview"), ("/leaders/", "Pareto leaders"), ("/plans/", "Plans"), ("/models/", "Models"),
+        ("/benchmarks/", "External benchmarks"), ("/methodology/", "Methodology"),
+        ("/community/", "Community runs"), ("/sources/", "Evidence")
+    ]
+    rendered = []
+    for href, label in links:
+        active = path == href or (href != "/" and path.startswith(href))
+        current = ' aria-current="page"' if active else ""
+        rendered.append(f'<a href="{href}"{current}>{e(label)}</a>')
+    return f'''<header class="site-header">
+      <a class="brand" href="/"><span class="brand-mark">TMX</span><span><strong>Tokenmaxx</strong><small>Evidence-weighted coding-plan economics</small></span></a>
+      <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav">Menu</button>
+      <nav id="site-nav" class="site-nav">{"".join(rendered)}</nav>
+    </header>
+    <script>const t=document.querySelector('.nav-toggle'),n=document.querySelector('#site-nav');t?.addEventListener('click',()=>{{const o=t.getAttribute('aria-expanded')==='true';t.setAttribute('aria-expanded',String(!o));n?.classList.toggle('is-open',!o)}});</script>'''
+
+
+def layout(title: str, body: str, path: str = "/", description: str = "An evidence-weighted comparison of AI coding subscriptions.") -> str:
+    page_title = "Tokenmaxx" if title == "Tokenmaxx" else f"{title} · Tokenmaxx"
+    return f'''<!doctype html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width"><meta name="description" content="{e(description)}"><meta name="theme-color" content="#0a0e13"><title>{e(page_title)}</title><link rel="stylesheet" href="/global.css"></head>
+<body><div class="page-shell">{nav(path)}<main>{body}</main><footer class="site-footer"><p>Evidence snapshot: 17 August 2026. Provider-hidden limits stay hidden; no guessed pools enter rankings.</p><div><a href="/data/plans.json">Plans JSON</a><a href="/data/benchmarks.json">Benchmarks JSON</a><a href="/data/models.json">Models JSON</a><a href="/data/leaders.json">Leaders JSON</a><a href="/schema/community-benchmark-submission.schema.json">Contribution schema</a></div></footer></div><script src="/app.js" defer></script></body></html>'''
+
+
+def write_page(path: str, content: str) -> None:
+    destination = DIST / path.strip("/")
+    if path.endswith(".html"):
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_text(content, encoding="utf-8")
+        return
+    destination.mkdir(parents=True, exist_ok=True)
+    (destination / "index.html").write_text(content, encoding="utf-8")
+
+
+def insight_card(metric: str, title: str, text: str, cls: str = "") -> str:
+    return f'<article class="insight-card {cls}"><div class="metric">{e(metric)}</div><h3>{e(title)}</h3><p>{e(text)}</p></article>'
+
+
+def plan_row(plan: dict[str, Any], detail: bool = False) -> str:
+    detail_text = f'<span class="cell-sub">{e(plan["name"])}</span>' if not detail else f'<span class="cell-sub">{e(plan["region"])}</span>'
+    cells = f'''<td><a href="/plans/{e(plan['id'])}/"><strong>{e(plan['provider'])}</strong>{detail_text}</a></td>
+      <td class="numeric">{e(plan['priceDisplay'])}</td>
+      <td class="numeric"><strong>{e(plan['valueDisplay'])}</strong><span class="cell-sub">{e(f"${plan['includedValueUsdMonthly']:,} quantified value" if plan['includedValueUsdMonthly'] is not None else f"Measured in {plan.get('planDenominator')}" if plan.get('planDenominator') else 'Provider-hidden denominator')}</span></td>
+      <td>{badge(plan['calculationStatus'])}<span class="cell-sub">{e(plan['confidence'])} confidence</span></td>
+      <td>{e(plan['headline'])}</td><td>{e(plan['region'])}</td>'''
+    attrs = f''' data-plan-row data-search="{e((plan['provider']+' '+plan['name']+' '+' '.join(plan['models'])+' '+plan['headline']).lower())}" data-status="{e(plan['calculationStatus'])}" data-provider="{e(plan['provider'])}" data-value="{plan['sortValue'] if plan['sortValue'] is not None else -1}" data-price="{plan['priceMonthly'] if plan['priceMonthly'] is not None else 999999}"'''
+    return f"<tr{attrs}>{cells}</tr>"
+
+
+def build_index() -> None:
+    ranked = sorted(
+        [p for p in plans if p.get("sortValue") is not None and (p.get("priceMonthly") or 0) > 0 and p.get("status") == "active"],
+        key=lambda p: p["sortValue"], reverse=True
+    )[:10]

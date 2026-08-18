@@ -1,0 +1,46 @@
+    write_page("/community/", layout("Community benchmark runs", body, "/community/"))
+
+
+def build_sources() -> None:
+    types = ["official", "measurement", "external-benchmark", "secondary"]
+    headings = {"official":"Official provider documentation","measurement":"Community measurements","external-benchmark":"External benchmark publishers","secondary":"Discovery and cross-check sources"}
+    sections = []
+    for source_type in types:
+        group = [s for s in sources if s["type"] == source_type]
+        if not group: continue
+        cards = "".join(f'<article class="insight-card"><h3><a href="{e(s["url"])}" target="_blank" rel="noreferrer">{e(s["title"])}</a></h3><p>{e(s["publisher"])} · verified {e(s["verifiedAt"])}</p><div class="tag-list" style="margin-top:14px">{"".join(f"<span class=\"tag\">{e(claim)}</span>" for claim in s["supports"])}</div></article>' for s in group)
+        sections.append(f'<section class="section compact"><div class="section-heading"><div><p class="section-kicker">{e(source_type)}</p><h2>{e(headings[source_type])}</h2></div><p>{len(group)} source records, verified through 17 August 2026.</p></div><div class="insight-grid">{cards}</div></section>')
+    body = '<section class="page-intro"><p class="eyebrow">Evidence graph</p><h1>Every quantified field should lead back to a source.</h1><p class="lede">Official pages establish prices, formulas and plan mechanics. Measurements estimate hidden pools. External benchmark publishers supply performance results. Secondary trackers discover plans and surface conflicts, but do not silently override primary evidence.</p></section>' + "".join(sections)
+    write_page("/sources/", layout("Evidence", body, "/sources/"))
+
+
+def copy_public() -> None:
+    for item in PUBLIC.iterdir():
+        target = DIST / item.name
+        if item.is_dir():
+            if target.exists(): shutil.rmtree(target)
+            shutil.copytree(item, target)
+        else:
+            shutil.copy2(item, target)
+
+
+def main() -> None:
+    if DIST.exists(): shutil.rmtree(DIST)
+    DIST.mkdir(parents=True)
+    copy_public()
+    build_index()
+    build_plans()
+    build_plan_details()
+    build_benchmarks()
+    build_leaders()
+    build_models()
+    build_methodology()
+    build_community()
+    build_sources()
+    # Simple static 404.
+    write_page("404.html", layout("Not found", '<section class="page-intro"><p class="eyebrow">404</p><h1>That page is not in this snapshot.</h1><p class="lede"><a href="/plans/">Return to the plan catalog.</a></p></section>', "/404"))
+    print(f"Built {sum(1 for _ in DIST.rglob('*.html'))} HTML pages in {DIST}")
+
+
+if __name__ == "__main__":
+    main()
