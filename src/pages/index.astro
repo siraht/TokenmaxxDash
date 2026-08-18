@@ -1,0 +1,97 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import plans from '../data/plans.json';
+import benchmarks from '../data/benchmarks.json';
+import leaders from '../data/leaders.json';
+import summary from '../data/summary.json';
+import { statusLabel } from '../lib/format';
+
+const ranked = plans
+  .filter((plan) => plan.sortValue != null && plan.priceMonthly > 0 && plan.status === 'active')
+  .sort((a, b) => (b.sortValue ?? -1) - (a.sortValue ?? -1))
+  .slice(0, 10);
+const agentById = new Map(benchmarks.map((row) => [row.id, row]));
+const costFrontier = leaders.codingAgentCostQualityPareto.map((id) => agentById.get(id)).filter(Boolean).slice(0, 8);
+---
+<BaseLayout title="Tokenmaxx">
+  <section class="hero">
+    <div>
+      <p class="eyebrow">Coding-plan economics, quality included</p>
+      <h1>Compare subscriptions by the constraint that actually matters.</h1>
+      <p class="lede">Token subsidy, model intelligence, coding-agent success, time, and provider-hidden quotas answer different questions. Tokenmaxx exposes the non-dominated choices instead of declaring the best-researched plan the universal winner.</p>
+      <div class="hero-actions">
+        <a class="button primary" href="/leaders">Explore Pareto leaders</a>
+        <a class="button" href="/plans">Search all plans</a>
+        <a class="button subtle" href="/benchmarks">Inspect external benchmarks</a>
+      </div>
+    </div>
+    <aside class="verdict-card">
+      <p class="section-kicker">Current market verdict</p>
+      <strong>No single winner</strong>
+      <span>StepFun leads transparent subsidy; Codex leads measured frontier subsidy.</span>
+      <p>The quality-adjusted frontier changes again once externally measured intelligence, task success, API cost, and speed are applied.</p>
+    </aside>
+  </section>
+
+  <section class="section compact" aria-label="Catalog summary">
+    <div class="kpi-grid">
+      <article class="kpi-card"><strong>{summary.planCount}</strong><span>active and historical plan tiers</span></article>
+      <article class="kpi-card"><strong>{summary.modelRouteCount}</strong><span>advertised model routes covered</span></article>
+      <article class="kpi-card"><strong>{summary.directBenchmarkModelRouteCount}</strong><span>routes with a direct external signal</span></article>
+      <article class="kpi-card"><strong>{summary.providerHiddenCount}</strong><span>provider-hidden pools, explicitly labeled</span></article>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="section-heading">
+      <div><p class="section-kicker">Different objectives, different leaders</p><h2>The comparison is a Pareto surface.</h2></div>
+      <p>A plan belongs on a frontier when no alternative is at least as capable and also cheaper, faster, or more generous on the selected denominator.</p>
+    </div>
+    <div class="insight-grid">
+      <article class="insight-card">
+        <div class="metric">{summary.topNormalizedValue.multiple}×</div>
+        <h3>Transparent nominal subsidy</h3>
+        <p>{summary.topNormalizedValue.label} leads the quantified recurring-price multiple, but this says nothing about the intelligence of the models bought with that pool.</p>
+      </article>
+      <article class="insight-card blue">
+        <div class="metric">{summary.topMeasuredFrontierSubsidy.multiple}×</div>
+        <h3>Measured frontier subsidy</h3>
+        <p>Codex Pro 20× leads the cleanly measured frontier-subscription API-equivalent evidence, not the entire market under every quality and latency requirement.</p>
+      </article>
+      <article class="insight-card warning">
+        <div class="metric">{costFrontier.length} non-dominated</div>
+        <h3>Coding-agent cost versus quality</h3>
+        <p>The imported Coding Agent Index currently has a ladder from maximum-effort Sol through Terra, Luna, DeepSeek Flash, and low-cost Composer configurations rather than one scalar champion.</p>
+      </article>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="section-heading">
+      <div><p class="section-kicker">Subscription subsidy</p><h2>Highest quantified recurring-price multiples</h2></div>
+      <p>These values retain their denominator—provider-rate dollars, credits, energy, or measured API equivalent—and therefore compare economic subsidy rather than intelligence.</p>
+    </div>
+    <div class="panel"><div class="table-shell"><table>
+      <thead><tr><th>Plan</th><th>Price</th><th>Quantified value</th><th>Evidence</th><th>Allowance</th></tr></thead>
+      <tbody>{ranked.map((plan) => <tr>
+        <td><a href={`/plans/${plan.id}`}><strong>{plan.provider} · {plan.name}</strong></a><span class="cell-sub">{plan.region}</span></td>
+        <td class="numeric">{plan.priceDisplay}</td><td class="numeric"><strong>{plan.valueDisplay}</strong></td>
+        <td><span class={`badge ${plan.calculationStatus}`}>{statusLabel(plan.calculationStatus)}</span></td><td>{plan.headline}</td>
+      </tr>)}</tbody>
+    </table></div></div>
+  </section>
+
+  <section class="section">
+    <div class="section-heading"><div><p class="section-kicker">External task economics</p><h2>Coding-agent cost–quality frontier</h2></div><a class="button subtle" href="/leaders">See every frontier</a></div>
+    <div class="panel"><div class="table-shell"><table>
+      <thead><tr><th>Agent / model</th><th>Index</th><th>API cost/task</th><th>API $/expected pass</th><th>Why it remains</th></tr></thead>
+      <tbody>{costFrontier.map((row) => <tr>
+        <td><strong>{row.agent}</strong><span class="cell-sub">{row.model}</span></td><td class="numeric">{row.score}</td>
+        <td class="numeric">${row.apiCostPerTaskUsd?.toFixed(2)}</td><td class="numeric">${row.apiUsdPerExpectedPass?.toFixed(3)}</td>
+        <td><span class="pareto-chip">non-dominated</span><span class="cell-sub">No imported configuration is both at least as capable and no more expensive per benchmark task.</span></td>
+      </tr>)}</tbody>
+    </table></div></div>
+  </section>
+
+  <section class="section compact"><div class="callout warning"><strong>Provider-hidden is a completed finding, not a blank cell.</strong> Where a vendor publishes the price and window mechanics but withholds the numerical pool, the record states exactly what remains unknowable and excludes the plan from allowance rankings.</div></section>
+</BaseLayout>

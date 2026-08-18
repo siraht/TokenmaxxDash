@@ -1,0 +1,173 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import plans from '../../data/plans.json';
+import sources from '../../data/sources.json';
+import benchmarks from '../../data/benchmarks.json';
+import models from '../../data/models.json';
+import taskEstimates from '../../data/subscription-task-estimates.json';
+import { formatNumber, statusLabel, titleCaseKey } from '../../lib/format';
+
+export function getStaticPaths() {
+  return plans.map((plan) => ({ params: { id: plan.id }, props: { plan } }));
+}
+
+const { plan } = Astro.props;
+const sourcesById = new Map(sources.map((source) => [source.id, source]));
+const planSources = plan.sourceIds.map((id) => sourcesById.get(id)).filter(Boolean);
+const agentMap = {
+  'openai-codex': 'Codex',
+  'claude-code': 'Claude Code',
+  'cursor': 'Cursor',
+  'kimi-code': 'Kimi Code CLI'
+};
+const benchmarkAgent = agentMap[plan.providerId];
+const planBenchmarks = benchmarkAgent
+  ? benchmarks.filter((row) => row.agent === benchmarkAgent && row.benchmark === 'Artificial Analysis Coding Agent Index').slice(0, 8)
+  : [];
+const modelById = new Map(models.map((row) => [row.id, row]));
+const planModelCoverage = (plan.modelCoverageIds || []).map((id) => modelById.get(id)).filter(Boolean);
+const planTaskEstimates = taskEstimates.filter((row) => row.planId === plan.id).sort((a,b) => a.subscriptionUsdPerExpectedPass - b.subscriptionUsdPerExpectedPass).slice(0,8);
+const detailSections = Object.entries(plan.details || {}).filter(([, value]) => value != null);
+
+const renderValue = (value) => {
+  if (typeof value === 'number') return formatNumber(value);
+  if (typeof value === 'boolean') return value ? 'Yes' : 'No';
+  if (Array.isArray(value)) return value.join(' – ');
+  if (value && typeof value === 'object') return JSON.stringify(value);
+  return String(value ?? '—');
+};
+const sectionRows = (value) => Array.isArray(value) ? value : [value];
+const sectionHeaders = (value) => {
+  const rows = sectionRows(value).filter((row) => row && typeof row === 'object');
+  return [...new Set(rows.flatMap((row) => Object.keys(row)))];
+};
+---
+<BaseLayout title={`${plan.provider} ${plan.name}`} description={plan.headline}>
+  <section class="detail-hero">
+    <div>
+      <p class="provider">{plan.provider}</p>
+      <h1>{plan.name}</h1>
+      <p class="lede">{plan.headline}</p>
+      <div class="meta-row">
+        <span class={`badge ${plan.calculationStatus}`}>{statusLabel(plan.calculationStatus)}</span>
+        <span class={`badge ${plan.confidence}`}>{plan.confidence} confidence</span>
+        <span class="badge status">{plan.allowanceType}</span>
+        <span class="badge status">{plan.region}</span>
+      </div>
+    </div>
+    <div class="detail-price">
+      <strong>{plan.priceDisplay}</strong>
+      <span>{plan.valueDisplay}</span>
+    </div>
+  </section>
+
+  <div class="detail-grid">
+    <div class="detail-main">
+      <section class="panel">
+        <div class="panel-header"><div><h3>Calculation</h3><p>The strongest normalization supported by the attached evidence.</p></div></div>
+        <div class="panel-body">
+          {plan.formula ? <pre class="formula"><code>{plan.formula}</code></pre> : <div class="callout warning"><strong>Provider-hidden denominator.</strong> The price or plan mechanics are known, but the binding numerical pool is not published, so no value multiple is inferred.</div>}
+          <dl class="definition-grid" style="margin-top:14px">
+            <div class="definition"><dt>Recurring price</dt><dd>{plan.priceDisplay}</dd></div>
+            <div class="definition"><dt>Quantified value</dt><dd>{plan.valueDisplay}</dd></div>
+            <div class="definition"><dt>Value represented</dt><dd>{plan.includedValueUsdMonthly != null ? `$${formatNumber(plan.includedValueUsdMonthly)} per average month` : (plan.planDenominator || 'Provider-hidden')}</dd></div>
+            <div class="definition"><dt>Usage unit</dt><dd>{plan.unit || 'Undisclosed'}</dd></div>
+            <div class="definition"><dt>Eligibility</dt><dd>{plan.eligibility}</dd></div>
+            <div class="definition"><dt>Benchmark coverage</dt><dd>{plan.benchmarkCoverage}</dd></div>
+            <div class="definition"><dt>Last verified</dt><dd>{plan.lastVerified}</dd></div>
+          </dl>
+        </div>
+      </section>
+
+      {(plan.bindingUnknowns || []).length > 0 && (
+        <section class="panel">
+          <div class="panel-header"><div><h3>Binding unknowns</h3><p>Known gaps that prevent stronger normalization.</p></div></div>
+          <div class="panel-body"><ul class="note-list">{plan.bindingUnknowns.map((item) => <li>{item}</li>)}</ul></div>
+        </section>
+      )}
+
+      {Object.keys(plan.quotas || {}).length > 0 && (
+        <section class="panel">
+          <div class="panel-header"><div><h3>Quota buckets</h3><p>Every applicable rolling or monthly bucket can become binding.</p></div></div>
+          <div class="panel-body">
+            <dl class="definition-grid">
+              {Object.entries(plan.quotas).map(([key, value]) => (
+                <div class="definition"><dt>{titleCaseKey(key)}</dt><dd>{renderValue(value)}</dd></div>
+              ))}
+            </dl>
+          </div>
+        </section>
+      )}
+
+      {detailSections.map(([sectionName, value]) => {
+        const rows = sectionRows(value);
+        const headers = sectionHeaders(value);
+        return (
+          <section class="panel">
+            <div class="panel-header"><div><h3>{titleCaseKey(sectionName)}</h3><p>Plan-specific rates, limits or derived outputs.</p></div></div>
+            <div class="table-shell">
+              {headers.length > 0 ? (
+                <table>
+                  <thead><tr>{headers.map((header) => <th>{titleCaseKey(header)}</th>)}</tr></thead>
+                  <tbody>
+                    {rows.map((row) => (
+                      <tr>{headers.map((header) => <td class={typeof row?.[header] === 'number' ? 'numeric' : undefined}>{renderValue(row?.[header])}</td>)}</tr>
+                    ))}
+                  </tbody>
+                </table>
+              ) : <div class="panel-body"><pre class="formula">{JSON.stringify(value, null, 2)}</pre></div>}
+            </div>
+          </section>
+        );
+      })}
+
+      {planModelCoverage.length > 0 && (
+        <section class="panel">
+          <div class="panel-header"><div><h3>Advertised model quality coverage</h3><p>Only direct external matches receive scores.</p></div><a href="/models">All models</a></div>
+          <div class="table-shell"><table><thead><tr><th>Model route</th><th>Coverage</th><th>Intelligence</th><th>Blended $/M</th><th>$/M/intelligence point</th></tr></thead><tbody>{planModelCoverage.map((row) => <tr><td><strong>{row.name}</strong></td><td>{row.benchmarkCoverage}</td><td class="numeric">{row.bestModelIntelligenceScore ?? '—'}</td><td class="numeric">{row.bestModelBlendedPricePerMUsd != null ? `$${row.bestModelBlendedPricePerMUsd.toFixed(3)}` : '—'}</td><td class="numeric">{row.blendedUsdPerIntelligencePoint != null ? `$${row.blendedUsdPerIntelligencePoint.toFixed(5)}` : '—'}</td></tr>)}</tbody></table></div>
+        </section>
+      )}
+
+      {planTaskEstimates.length > 0 && (
+        <section class="panel">
+          <div class="panel-header"><div><h3>Direct subscription task estimates</h3><p>Measured plan pool joined to a native external benchmark route.</p></div><a href="/leaders">Pareto leaders</a></div>
+          <div class="table-shell"><table><thead><tr><th>Model</th><th>Index</th><th>Expected passes/month</th><th>Subscription $/expected pass</th></tr></thead><tbody>{planTaskEstimates.map((row) => <tr><td><strong>{row.model}</strong></td><td class="numeric">{row.score}</td><td class="numeric">{row.expectedBenchmarkPassesPerAverageMonth.toLocaleString()}</td><td class="numeric">${row.subscriptionUsdPerExpectedPass.toFixed(4)}</td></tr>)}</tbody></table></div>
+        </section>
+      )}
+
+      {planBenchmarks.length > 0 && (
+        <section class="panel">
+          <div class="panel-header"><div><h3>External benchmark rows for this agent</h3><p>Artificial Analysis API-cost counterfactuals, not subscription cost allocations.</p></div><a href="/benchmarks">All benchmarks</a></div>
+          <div class="table-shell">
+            <table>
+              <thead><tr><th>Model</th><th>Index</th><th>DeepSWE</th><th>Terminal</th><th>API cost/task</th><th>Time/task</th></tr></thead>
+              <tbody>
+                {planBenchmarks.map((row) => (
+                  <tr><td><strong>{row.model}</strong></td><td class="numeric">{row.score}</td><td class="numeric">{row.deepSWE ?? '—'}%</td><td class="numeric">{row.terminalBenchV2 ?? '—'}%</td><td class="numeric">${row.apiCostPerTaskUsd?.toFixed(2)}</td><td class="numeric">{row.timePerTaskMinutes?.toFixed(1)}m</td></tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
+    </div>
+
+    <aside class="detail-aside">
+      {plan.notes.length > 0 && (
+        <section class="panel"><div class="panel-header"><h3>Interpretation</h3></div><div class="panel-body"><ul class="note-list">{plan.notes.map((note) => <li>{note}</li>)}</ul></div></section>
+      )}
+      {plan.models.length > 0 && (
+        <section class="panel"><div class="panel-header"><h3>Models or catalog</h3></div><div class="panel-body"><div class="tag-list">{plan.models.map((model) => <span class="tag">{model}</span>)}</div></div></section>
+      )}
+      <section class="panel">
+        <div class="panel-header"><h3>Evidence</h3></div>
+        <div class="panel-body source-list">
+          {planSources.length ? planSources.map((source) => (
+            <a class="source-link" href={source.url} target="_blank" rel="noreferrer"><strong>{source.title}</strong><span>{source.publisher} · {source.type}</span></a>
+          )) : <p class="cell-sub">No attached source record yet.</p>}
+        </div>
+      </section>
+      <a class="button" href="/plans">← Back to all plans</a>
+    </aside>
+  </div>
+</BaseLayout>

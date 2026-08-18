@@ -1,0 +1,53 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import plans from '../../data/plans.json';
+import summary from '../../data/summary.json';
+import { statusLabel } from '../../lib/format';
+const providers = [...new Set(plans.map((plan) => plan.provider))].sort();
+const ordered = [...plans].sort((a, b) => (b.sortValue ?? -1) - (a.sortValue ?? -1));
+---
+<BaseLayout title="Plans" description={`Search and compare ${summary.planCount} coding subscription tiers with evidence status, prices, quotas, and normalized value calculations.`}>
+  <section class="page-intro">
+    <p class="eyebrow">{summary.planCount} tiers · {summary.providerCount} providers</p>
+    <h1>Every plan, including the ones that cannot be ranked yet.</h1>
+    <p class="lede">Exact plans expose their published unit and formula. Derived plans combine official rates with reproducible measurements. Partial, measured-range, provider-hidden, and secondary records remain visible without receiving invented economics.</p>
+  </section>
+
+  <section class="section compact">
+    <div class="toolbar" aria-label="Plan filters">
+      <div class="control"><label for="plan-search">Search</label><input id="plan-search" data-filter-search type="search" placeholder="Provider, tier, model or quota…" /></div>
+      <div class="control"><label for="plan-status">Evidence</label><select id="plan-status" data-filter-status><option value="all">All evidence</option><option value="exact">Official exact</option><option value="derived">Evidence-derived</option><option value="measured-range">Measured range</option><option value="partial">Partially normalized</option><option value="provider-hidden">Provider-hidden</option><option value="secondary">Secondary-source</option><option value="legacy">Legacy</option></select></div>
+      <div class="control"><label for="plan-provider">Provider</label><select id="plan-provider" data-filter-provider><option value="all">All providers</option>{providers.map((provider) => <option value={provider}>{provider}</option>)}</select></div>
+      <div class="control"><label for="plan-sort">Sort</label><select id="plan-sort" data-sort-plans><option value="value-desc">Quantified value</option><option value="price-asc">Price: low to high</option><option value="price-desc">Price: high to low</option><option value="provider">Provider</option></select></div>
+    </div>
+    <p class="results-count" data-results-count>{plans.length} plan tiers</p>
+
+    <div class="panel">
+      <div class="table-shell">
+        <table data-plan-table>
+          <thead><tr><th>Provider / plan</th><th>Price</th><th>Value multiple</th><th>Evidence</th><th>Allowance</th><th>Region</th></tr></thead>
+          <tbody>
+            {ordered.map((plan) => (
+              <tr
+                data-plan-row
+                data-search={`${plan.provider} ${plan.name} ${plan.models.join(' ')} ${plan.headline}`.toLowerCase()}
+                data-status={plan.calculationStatus}
+                data-provider={plan.provider}
+                data-value={plan.sortValue ?? -1}
+                data-price={plan.priceMonthly ?? 999999}
+              >
+                <td><a href={`/plans/${plan.id}`}><strong>{plan.provider}</strong><span class="cell-sub">{plan.name}</span></a></td>
+                <td class="numeric">{plan.priceDisplay}</td>
+                <td class="numeric"><strong>{plan.valueDisplay}</strong><span class="cell-sub">{plan.includedValueUsdMonthly != null ? `$${plan.includedValueUsdMonthly.toLocaleString()} quantified value` : plan.planDenominator ? `Measured in ${plan.planDenominator}` : 'Provider-hidden denominator'}</span></td>
+                <td><span class={`badge ${plan.calculationStatus}`}>{statusLabel(plan.calculationStatus)}</span><span class="cell-sub">{plan.confidence} confidence</span></td>
+                <td>{plan.headline}</td>
+                <td>{plan.region}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div class="empty-state" data-empty-state>No plan matches those filters.</div>
+    </div>
+  </section>
+</BaseLayout>

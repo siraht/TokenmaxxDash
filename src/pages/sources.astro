@@ -1,0 +1,31 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import sources from '../data/sources.json';
+const groups = sources.reduce((acc, source) => {
+  (acc[source.type] ||= []).push(source);
+  return acc;
+}, {});
+const orderedTypes = ['official', 'measurement', 'external-benchmark', 'secondary'];
+---
+<BaseLayout title="Evidence" description="Primary pricing documentation, community measurements, external benchmark sources, and secondary discovery sources behind Tokenmaxx.">
+  <section class="page-intro">
+    <p class="eyebrow">Evidence graph</p>
+    <h1>Every quantified field should lead back to a source.</h1>
+    <p class="lede">Official pages establish prices, formulas and plan mechanics. Measurements estimate hidden pools. External benchmark publishers supply performance results. Secondary trackers discover plans and surface conflicts, but do not silently override primary evidence.</p>
+  </section>
+
+  {orderedTypes.map((type) => groups[type]?.length ? (
+    <section class="section compact">
+      <div class="section-heading"><div><p class="section-kicker">{type}</p><h2>{type === 'official' ? 'Official provider documentation' : type === 'measurement' ? 'Community measurements' : type === 'external-benchmark' ? 'External benchmark publishers' : 'Discovery and cross-check sources'}</h2></div><p>{groups[type].length} source records, verified through 17 August 2026.</p></div>
+      <div class="insight-grid">
+        {groups[type].map((source) => (
+          <article class="insight-card">
+            <h3><a href={source.url} target="_blank" rel="noreferrer">{source.title}</a></h3>
+            <p>{source.publisher} · verified {source.verifiedAt}</p>
+            <div class="tag-list" style="margin-top:14px">{source.supports.map((claim) => <span class="tag">{claim}</span>)}</div>
+          </article>
+        ))}
+      </div>
+    </section>
+  ) : null)}
+</BaseLayout>
