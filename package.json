@@ -14,7 +14,7 @@
     "check:sources": "python3 scripts/check_astro_sources.py",
     "prepare:data": "npm run refresh:data && npm run sync:data",
     "sync:data": "python3 scripts/sync_public_data.py",
-    "refresh:data": "python3 scripts/build_data.py && python3 scripts/enrich_data.py && python3 scripts/complete_data.py",
+    "refresh:data": "python3 scripts/build_data.py && python3 scripts/complete_data.py",
     "watch:sources": "python3 scripts/watch_sources.py --write-state --save-snapshots",
     "verify": "npm run prepare:data && npm run check:data && npm run check:sources && python3 scripts/watch_sources.py --validate-only && node --check public/app.js && node --check public/community.js && python3 -m py_compile scripts/*.py"
   },
