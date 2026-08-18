@@ -12,6 +12,9 @@ const modelRows = benchmarks
 const terminalRows = benchmarks
   .filter((row) => row.benchmark === 'Terminal-Bench')
   .sort((a, b) => b.score - a.score);
+const cursorBenchRows = benchmarks
+  .filter((row) => row.benchmark === 'CursorBench')
+  .sort((a, b) => b.score - a.score || (a.apiUsdPerExpectedPass ?? Infinity) - (b.apiUsdPerExpectedPass ?? Infinity));
 const agents = [...new Set(agentRows.map((row) => row.agent))].sort();
 const sourceMap = new Map(sources.map((source) => [source.id, source]));
 const fableRows = benchmarks.filter((row) => row.model?.toLowerCase().includes('fable'));
@@ -103,6 +106,29 @@ const className = (agent) => agent.toLowerCase().replace(/[^a-z0-9]+/g, '-').rep
         </tr>
       ))}</tbody>
     </table></div></div>
+  </section>
+
+  <section class="section">
+    <div class="section-heading">
+      <div><p class="section-kicker">Publisher-owned task benchmark</p><h2>CursorBench 3.2</h2></div>
+      <p>Cursor publishes pass rate, model API cost, tokens, and agent steps for the same Cursor Agent harness. These rows are kept on their own scale and are not merged into the Artificial Analysis Coding Agent Index.</p>
+    </div>
+    <div class="panel"><div class="table-shell"><table>
+      <thead><tr><th>Cursor Agent model</th><th>Pass rate</th><th>API cost/task</th><th>API $/expected pass</th><th>Tokens/task</th><th>Tokens/expected pass</th><th>Steps/task</th><th>Steps/expected pass</th></tr></thead>
+      <tbody>{cursorBenchRows.map((row) => (
+        <tr>
+          <td><strong>{row.model}</strong><span class="cell-sub">CursorBench {row.version}</span></td>
+          <td class="numeric"><strong>{row.score.toFixed(1)}%</strong></td>
+          <td class="numeric">${row.apiCostPerTaskUsd.toFixed(2)}</td>
+          <td class="numeric"><strong>${row.apiUsdPerExpectedPass.toFixed(3)}</strong></td>
+          <td class="numeric">{row.tokensPerTask.toLocaleString()}</td>
+          <td class="numeric">{Math.round(row.tokensPerExpectedPass).toLocaleString()}</td>
+          <td class="numeric">{row.stepsPerTask}</td>
+          <td class="numeric">{row.stepsPerExpectedPass.toFixed(1)}</td>
+        </tr>
+      ))}</tbody>
+    </table></div></div>
+    <div class="callout" style="margin-top:14px"><strong>Fable now has four CursorBench effort points.</strong> Max scores highest at 70.5%, while Medium is substantially cheaper at $6.80/task. That trade-off remains visible even when another model is Pareto-optimal on a different benchmark.</div>
   </section>
 
   <section class="section">
