@@ -1,0 +1,79 @@
+))
+
+# BytePlus ModelArk: published model-call buckets rather than token pools.
+for id_, name, price, calls5, calls7, callsm in [
+    ("byteplus-modelark-lite", "Lite", 10, 1900, 12000, 24000),
+    ("byteplus-modelark-pro", "Pro", 50, 9500, 60000, 120000),
+]:
+    upsert(make_plan(
+        id=id_, provider_id="byteplus-modelark", provider="BytePlus ModelArk", name=name,
+        price=price, price_display=f"${price}/mo", status="exact", confidence="high",
+        allowance_type="model calls",
+        headline=f"Approximately {calls5:,} model calls/5h, {calls7:,}/week and {callsm:,}/subscription month.",
+        sources_=["byteplus-modelark-coding-plan-2026", "byteplus-modelark-offer-2026"],
+        models=["Dola-Seed-2.0-Code", "Seed-Code", "GLM-5.1", "GLM-4.7", "DeepSeek V3.2", "GPT-OSS"],
+        unit="model call", plan_units=callsm,
+        quotas={"rollingFiveHourModelCallsApprox": calls5, "weeklyModelCallsApprox": calls7, "subscriptionMonthModelCallsApprox": callsm},
+        formula="one provider model invocation consumes one request; a user prompt commonly triggers multiple invocations",
+        value_display=f"~{callsm:,} calls/mo",
+        details={"simplePromptCallsApprox": [5, 15], "complexPromptCallsApprox": [15, 30], "promptsPerMonthSimpleApprox": [math.floor(callsm/15), math.floor(callsm/5)], "promptsPerMonthComplexApprox": [math.floor(callsm/30), math.floor(callsm/15)]},
+        eligibility="interactive-coding-only",
+        workload_eligibility={"interactiveCoding": True, "unattendedAutomation": False, "applicationBackend": False, "note": "Plan credentials are limited to AI coding tools; use the regular ModelArk API for production services."},
+    ))
+
+# Current Alibaba global Coding Plan. Retire obsolete tracker tiers.
+remove_ids(["qwen-global-lite", "qwen-global-standard", "qwen-global-pro"])
+upsert(make_plan(
+    id="alibaba-global-coding-pro", provider_id="qwen-global-token-plan", provider="Alibaba Cloud Coding Plan", name="Pro",
+    price=50, price_display="$50/mo global · ¥200/mo China", status="exact", confidence="high",
+    allowance_type="model calls", headline="6,000 model calls/5h, 45,000/week and 90,000/month across an exact model allowlist.",
+    sources_=["alibaba-global-coding-plan-2026"],
+    models=["Qwen3.7 Plus", "Qwen3.6 Plus", "Kimi K2.5", "GLM-5", "MiniMax M2.5", "Qwen3.5 Plus", "Qwen3 Max 2026-01-23", "Qwen3 Coder Next", "Qwen3 Coder Plus", "GLM-4.7"],
+    unit="model call", plan_units=90000,
+    quotas={"rollingFiveHourModelCalls": 6000, "weeklyModelCalls": 45000, "monthlyModelCalls": 90000},
+    formula="one plan model invocation consumes one request; a user prompt often invokes the model several times",
+    value_display="90,000 calls/mo",
+    details={"simplePromptCallsApprox": [5, 10], "complexPromptCallsApprox": [10, 30], "simplePromptsPerMonthApprox": [9000, 18000], "complexPromptsPerMonthApprox": [3000, 9000], "litePlanStatus": "discontinued for new subscriptions and renewals"},
+    eligibility="interactive-coding-only",
+    workload_eligibility={"interactiveCoding": True, "unattendedAutomation": False, "applicationBackend": False, "note": "Official terms prohibit automated scripts, application backends and other non-interactive use."},
+))
+
+# Ozore: current two-tier gateway subscriptions with exact dollar credits.
+remove_ids(["ozore-starter", "ozore-builder", "ozore-pro", "ozore-max"])
+for id_, name, price, credit in [("ozore-basic", "Basic", 10, 20), ("ozore-pro", "Pro", 35, 70)]:
+    upsert(make_plan(
+        id=id_, provider_id="ozore", provider="Ozore", name=name, price=price, price_display=f"${price}/mo",
+        status="exact", confidence="high", allowance_type="dollar-denominated model credits",
+        headline=f"${credit} monthly model credits spent at Ozore's published discounted token rates.",
+        sources_=["ozore-pricing-2026"],
+        models=["GPT-5.6 Sol", "Claude Opus 4.8", "Gemini 3.6 Flash", "GLM-5.2", "DeepSeek V4 Pro", "MiniMax M3", "MiMo V2.5 Pro", "Grok 4.5", "Hy3"],
+        unit="USD model credit", plan_units=credit, quotas={"monthlyModelCreditsUsd": credit},
+        formula="included model-credit value / recurring subscription price",
+        value_display=f"{credit/price:g}×", value_multiple=credit/price, included_value=credit,
+        details={"monthlyCreditsExpire": True, "topUpCreditsExpire": False, "maximumAdvertisedDiscountPercent": 35},
+        eligibility="api-and-coding-tools",
+        workload_eligibility={"interactiveCoding": True, "unattendedAutomation": True, "applicationBackend": True},
+    ))
+
+# Neuralwatt: exact energy pool; estimated request counts use live trailing-7-day model measurements.
+energy_models = [
+    {"model": "DeepSeek V4 Flash", "averageWhPerRequest": 0.25161, "inputPricePerMUsd": 0.10, "cachedPricePerMUsd": 0.03, "outputPricePerMUsd": 0.21},
+    {"model": "GLM-5.2", "averageWhPerRequest": 1.70, "inputPricePerMUsd": 1.45, "cachedPricePerMUsd": 0.36, "outputPricePerMUsd": 4.50},
+    {"model": "GLM-5.2 Fast", "averageWhPerRequest": 0.43799, "inputPricePerMUsd": 1.45, "cachedPricePerMUsd": 0.36, "outputPricePerMUsd": 4.50},
+    {"model": "GLM-5.2 Short", "averageWhPerRequest": 0.92297, "inputPricePerMUsd": 1.45, "cachedPricePerMUsd": 0.36, "outputPricePerMUsd": 4.50},
+    {"model": "GLM-5.2 Short Fast", "averageWhPerRequest": 0.60112, "inputPricePerMUsd": 1.45, "cachedPricePerMUsd": 0.36, "outputPricePerMUsd": 4.50},
+    {"model": "Gemma 4 31B", "averageWhPerRequest": 0.02374, "inputPricePerMUsd": 0.14, "cachedPricePerMUsd": 0.04, "outputPricePerMUsd": 0.42},
+    {"model": "Kimi K2.6", "averageWhPerRequest": 1.58, "inputPricePerMUsd": 0.69, "cachedPricePerMUsd": 0.17, "outputPricePerMUsd": 3.22},
+    {"model": "Kimi K2.6 Fast", "averageWhPerRequest": 0.29794, "inputPricePerMUsd": 0.69, "cachedPricePerMUsd": 0.17, "outputPricePerMUsd": 3.22},
+    {"model": "Kimi K2.7 Code", "averageWhPerRequest": 0.47817, "inputPricePerMUsd": 0.95, "cachedPricePerMUsd": 0.24, "outputPricePerMUsd": 4.00},
+    {"model": "Qwen3.5 397B", "averageWhPerRequest": 0.28916, "inputPricePerMUsd": 0.69, "cachedPricePerMUsd": 0.17, "outputPricePerMUsd": 4.14},
+    {"model": "Qwen3.5 397B Fast", "averageWhPerRequest": 0.05078, "inputPricePerMUsd": 0.69, "cachedPricePerMUsd": 0.17, "outputPricePerMUsd": 4.14},
+    {"model": "Qwen3.6 35B", "averageWhPerRequest": 0.21808, "inputPricePerMUsd": 0.29, "cachedPricePerMUsd": 0.07, "outputPricePerMUsd": 1.15},
+    {"model": "Qwen3.6 35B Fast", "averageWhPerRequest": 0.05854, "inputPricePerMUsd": 0.29, "cachedPricePerMUsd": 0.07, "outputPricePerMUsd": 1.15},
+]
+for id_, name, price, kwh, overage in [
+    ("neural-watt-basic", "Basic", 20, 2.35, 8.50),
+    ("neural-watt-standard", "Standard", 50, 6.25, 8.00),
+    ("neural-watt-pro", "Pro", 100, 13.33, 7.50),
+]:
+    model_estimates = []

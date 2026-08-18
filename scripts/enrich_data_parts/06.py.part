@@ -1,0 +1,113 @@
+    model_row("aa-model-deepseek-v4-pro-max", "DeepSeek", "DeepSeek V4 Pro (max)", 44, 0.435, 0.004, 0.87, 71),
+    model_row("aa-model-gpt-5-6-terra-xhigh", "OpenAI", "GPT-5.6 Terra (xhigh)", 52, 2.5, 0.25, 15, 124.8),
+    model_row("aa-model-gpt-5-6-luna-max", "OpenAI", "GPT-5.6 Luna (max)", 51, 1, 0.1, 6, 195),
+    model_row("aa-model-glm-5-2-max", "Z.AI", "GLM-5.2 (max)", 51, 1.4, 0.26, 4.4, 176.8),
+    model_row("aa-model-gemini-3-5-flash-high", "Google", "Gemini 3.5 Flash (high)", 50, 1.5, 0.15, 9, 193.2),
+    model_row("aa-model-gpt-5-6-luna-xhigh", "OpenAI", "GPT-5.6 Luna (xhigh)", 49, 1, 0.1, 6, 190.9),
+    model_row("aa-model-qwen3-7-max", "Alibaba", "Qwen3.7 Max", 46, 2.5, 0.25, 7.5, 202.1, 2.45),
+    model_row("aa-model-gpt-5-6-terra-medium", "OpenAI", "GPT-5.6 Terra (medium)", 46, 2.5, 0.25, 15, 119.6),
+    model_row("aa-model-gemini-3-5-flash-medium", "Google", "Gemini 3.5 Flash (medium)", 45, 1.5, 0.15, 9, 170.2),
+    model_row("aa-model-minimax-m3", "MiniMax", "MiniMax M3", 44, 0.30, 0.06, 1.20, 79.4),
+    model_row("aa-model-kimi-k2-6", "Moonshot AI", "Kimi K2.6", 44, 0.95, 0.16, 4, 43.5, notes="Deprecated in favor of Kimi K3 on some providers."),
+    model_row("aa-model-kimi-k2-7-code", "Moonshot AI", "Kimi K2.7 Code", 42, 0.95, 0.19, 4, 44.6),
+    model_row("aa-model-mimo-v2-5-pro", "Xiaomi", "MiMo V2.5 Pro", 42, 0.435, 0.004, 0.87, 64.6),
+    model_row("aa-model-hy3", "Tencent", "Hy3", 41, 0.136, 0.034, 0.557, 62.5),
+    model_row("aa-model-deepseek-v4-flash-max", "DeepSeek", "DeepSeek V4 Flash (max)", 40, 0.14, 0.003, 0.28, 118.2),
+    model_row("aa-model-qwen3-6-plus", "Alibaba", "Qwen3.6 Plus", 40, 0.50, 0.05, 3, 53.3),
+    model_row("aa-model-qwen3-7-plus", "Alibaba", "Qwen3.7 Plus", 39, 0.40, 0.04, 1.60, 52.4),
+    model_row("aa-model-gpt-5-6-luna-medium", "OpenAI", "GPT-5.6 Luna (medium)", 38, 1, 0.1, 6, 194.3),
+    model_row("aa-model-mimo-v2-5", "Xiaomi", "MiMo V2.5", 37, 0.14, 0.003, 0.28, 73.6),
+    model_row("aa-model-gemini-3-5-flash-lite", "Google", "Gemini 3.5 Flash-Lite", 36, 0.30, 0.03, 2.50, 381.8),
+    model_row("aa-model-gemini-3-5-flash-minimal", "Google", "Gemini 3.5 Flash (minimal)", 35, 1.5, 0.15, 9, None),
+    model_row("aa-model-gpt-5-6-luna-low", "OpenAI", "GPT-5.6 Luna (low)", 33, 1, 0.1, 6, 174.3),
+    model_row("aa-stepfun-step-3-7-flash", "StepFun", "Step 3.7 Flash", 31, 0.25, 0.05, 1.0, 132.5),
+    model_row("aa-stepfun-step-3-5-flash-2603", "StepFun", "Step 3.5 Flash 2603", 27, 0.08, 0.02, 0.35, 222.9),
+    model_row("aa-stepfun-step-3-5-flash", "StepFun", "Step 3.5 Flash", 26, 0.16, 0.03, 0.65, 243),
+]
+benchmarks = [b for b in benchmarks if b.get("kind") != "model-intelligence"] + model_rows
+
+# Derived economics for externally published benchmark rows.
+for row in benchmarks:
+    score = row.get("score")
+    if not isinstance(score, (int, float)) or score <= 0:
+        continue
+    if row.get("kind") == "coding-agent" and row.get("benchmark") == "Artificial Analysis Coding Agent Index":
+        cost = row.get("apiCostPerTaskUsd")
+        if isinstance(cost, (int, float)) and cost > 0:
+            pass_rate = score / 100
+            row["expectedPassesPerApiDollar"] = round(pass_rate / cost, 6)
+            row["apiUsdPerExpectedPass"] = round(cost / pass_rate, 6)
+            row["scorePointsPerApiDollar"] = round(score / cost, 6)
+        if isinstance(row.get("timePerTaskMinutes"), (int, float)):
+            row["minutesPerExpectedPass"] = round(row["timePerTaskMinutes"] / (score / 100), 6)
+    if row.get("kind") == "model-intelligence":
+        blended = row.get("blendedPricePerMUsd")
+        if isinstance(blended, (int, float)) and blended > 0:
+            row["intelligencePointsPerBlendedDollar"] = round(score / blended, 6)
+            row["blendedUsdPerIntelligencePoint"] = round(blended / score, 8)
+        speed = row.get("outputTokensPerSecond")
+        if isinstance(speed, (int, float)):
+            row["intelligenceSpeedProduct"] = round(score * speed, 3)
+
+
+def mark_pareto(rows: list[dict[str, Any]], *, score_key: str, cost_key: str, flag: str, minimize_cost: bool = True) -> None:
+    valid = [r for r in rows if isinstance(r.get(score_key), (int, float)) and isinstance(r.get(cost_key), (int, float))]
+    for row in rows:
+        row[flag] = False
+    for row in valid:
+        dominated = False
+        for other in valid:
+            if other is row:
+                continue
+            score_better = other[score_key] >= row[score_key]
+            cost_better = other[cost_key] <= row[cost_key] if minimize_cost else other[cost_key] >= row[cost_key]
+            strict = other[score_key] > row[score_key] or (other[cost_key] < row[cost_key] if minimize_cost else other[cost_key] > row[cost_key])
+            if score_better and cost_better and strict:
+                dominated = True
+                break
+        row[flag] = not dominated
+
+agent_index_rows = [b for b in benchmarks if b.get("benchmark") == "Artificial Analysis Coding Agent Index"]
+mark_pareto(agent_index_rows, score_key="score", cost_key="apiCostPerTaskUsd", flag="costQualityPareto")
+mark_pareto(agent_index_rows, score_key="score", cost_key="timePerTaskMinutes", flag="timeQualityPareto")
+mark_pareto(agent_index_rows, score_key="score", cost_key="tokensPerTaskM", flag="tokenQualityPareto")
+mark_pareto(model_rows, score_key="score", cost_key="blendedPricePerMUsd", flag="priceIntelligencePareto")
+mark_pareto(model_rows, score_key="score", cost_key="outputTokensPerSecond", flag="speedIntelligencePareto", minimize_cost=False)
+
+# Canonical model catalog and benchmark coverage for every advertised route.
+def slug(value: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "-", value.lower()).strip("-")
+
+
+def canonicalize(value: str) -> str:
+    value = value.strip()
+    value = re.sub(r"\s+off-peak$", "", value, flags=re.I)
+    value = re.sub(r"\s+\(promo\)$", "", value, flags=re.I)
+    substitutions = {
+        "Claude Opus 5": "Claude Opus 5",
+        "Opus 5": "Claude Opus 5",
+        "Claude Fable 5": "Claude Fable 5",
+        "Fable 5": "Claude Fable 5",
+        "Gemma 31B": "Gemma 4 31B",
+        "HY3": "Hy3",
+        "GPT-5.6 Sol": "GPT-5.6 Sol",
+        "GPT-5.6 Terra": "GPT-5.6 Terra",
+        "GPT-5.6 Luna": "GPT-5.6 Luna",
+    }
+    return substitutions.get(value, value)
+
+
+def base_benchmark_model(value: str) -> str:
+    value = canonicalize(value)
+    value = re.sub(r"\s*\((max|xhigh|high|medium|low|minimal|none|fallback)[^)]*\)$", "", value, flags=re.I)
+    if value.startswith("Claude "):
+        return value
+    if value.startswith("Opus "):
+        return "Claude " + value
+    if value.startswith("Fable "):
+        return "Claude " + value
+    return value
+
+plan_models: dict[str, list[str]] = {}
+for plan in plans:
+    for model in plan.get("models", []):

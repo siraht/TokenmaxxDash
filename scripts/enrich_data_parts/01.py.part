@@ -1,0 +1,173 @@
+#!/usr/bin/env python3
+"""Post-process the generated market snapshot with current primary-source corrections,
+external benchmark economics, canonical model coverage, and Pareto frontiers.
+
+This script deliberately does not crawl or benchmark. It turns reviewed source facts into
+versioned, deterministic JSON consumed by both Astro and the dependency-free static build.
+"""
+from __future__ import annotations
+
+import json
+import math
+import re
+from copy import deepcopy
+from pathlib import Path
+from typing import Any, Iterable
+
+ROOT = Path(__file__).resolve().parents[1]
+DATA = ROOT / "src" / "data"
+PUBLIC_DATA = ROOT / "public" / "data"
+AS_OF = "2026-08-17"
+AVG_WEEKS_PER_MONTH = 365.2425 / 12 / 7
+
+
+def read(name: str) -> Any:
+    return json.loads((DATA / name).read_text(encoding="utf-8"))
+
+
+def write(name: str, value: Any) -> None:
+    text = json.dumps(value, ensure_ascii=False, indent=2) + "\n"
+    (DATA / name).write_text(text, encoding="utf-8")
+    PUBLIC_DATA.mkdir(parents=True, exist_ok=True)
+    (PUBLIC_DATA / name).write_text(text, encoding="utf-8")
+
+
+plans: list[dict[str, Any]] = read("plans.json")
+benchmarks: list[dict[str, Any]] = read("benchmarks.json")
+sources: list[dict[str, Any]] = read("sources.json")
+methodology: dict[str, Any] = read("methodology.json")
+
+
+def add_source(source: dict[str, Any]) -> None:
+    existing = {row["id"]: row for row in sources}
+    if source["id"] in existing:
+        existing[source["id"]].update(source)
+    else:
+        sources.append(source)
+
+
+OFFICIAL_SOURCES = [
+    {
+        "id": "amazon-q-developer-quotas-2026",
+        "title": "Amazon Q Developer endpoints and quotas",
+        "publisher": "AWS",
+        "url": "https://docs.aws.amazon.com/general/latest/gr/amazonqdev.html",
+        "type": "official",
+        "supports": ["10,000 Pro inference calls/month", "about 1,000 user inputs", "4,000 transformation LOC/month"],
+        "verifiedAt": AS_OF,
+    },
+    {
+        "id": "amazon-q-developer-pricing-2026",
+        "title": "Amazon Q Developer pricing",
+        "publisher": "AWS",
+        "url": "https://aws.amazon.com/q/developer/pricing/",
+        "type": "official",
+        "supports": ["Free 50 agentic requests/month", "Pro $19/user/month", "1,000 Free transformation LOC/month"],
+        "verifiedAt": AS_OF,
+    },
+    {
+        "id": "byteplus-modelark-coding-plan-2026",
+        "title": "ModelArk Coding Plan subscription details",
+        "publisher": "BytePlus",
+        "url": "https://docs.byteplus.com/en/docs/ModelArk/1925114",
+        "type": "official",
+        "supports": ["Lite and Pro model-call limits", "5-hour, weekly and monthly buckets", "interactive coding restriction"],
+        "verifiedAt": AS_OF,
+    },
+    {
+        "id": "byteplus-modelark-offer-2026",
+        "title": "ModelArk Coding Plan offer and recurring prices",
+        "publisher": "BytePlus",
+        "url": "https://docs.byteplus.com/api/docs/ModelArk/1928265",
+        "type": "official",
+        "supports": ["Lite $10/month", "Pro $50/month", "supported coding models"],
+        "verifiedAt": AS_OF,
+    },
+    {
+        "id": "alibaba-global-coding-plan-2026",
+        "title": "Alibaba Cloud Model Studio Coding Plan",
+        "publisher": "Alibaba Cloud",
+        "url": "https://help.aliyun.com/en/model-studio/coding-plan",
+        "type": "official",
+        "supports": ["Pro price and request limits", "exact supported-model allowlist", "Lite discontinuation", "non-interactive-use prohibition"],
+        "verifiedAt": AS_OF,
+    },
+    {
+        "id": "venice-pricing-2026",
+        "title": "Venice pricing",
+        "publisher": "Venice.ai",
+        "url": "https://venice.ai/pricing",
+        "type": "official",
+        "supports": ["Free, Pro, Pro Plus and Max prices", "monthly credits", "100 credits = $1", "credit banking"],
+        "verifiedAt": AS_OF,
+    },
+    {
+        "id": "ozore-pricing-2026",
+        "title": "Ozore model pricing and subscriptions",
+        "publisher": "Ozore",
+        "url": "https://ozore.com/",
+        "type": "official",
+        "supports": ["Basic $10 for $20 monthly credits", "Pro $35 for $70 monthly credits", "discounted per-token model rates"],
+        "verifiedAt": AS_OF,
+    },
+    {
+        "id": "neuralwatt-pricing-2026",
+        "title": "Neuralwatt energy-based inference pricing",
+        "publisher": "Neuralwatt",
+        "url": "https://portal.neuralwatt.com/pricing",
+        "type": "official",
+        "supports": ["subscription kWh allowances", "overage rates", "PAYG $10/kWh", "trailing-seven-day energy/request measurements"],
+        "verifiedAt": AS_OF,
+    },
+    {
+        "id": "tabnine-pricing-2026",
+        "title": "Tabnine plans and model-cost policy",
+        "publisher": "Tabnine",
+        "url": "https://www.tabnine.com/pricing",
+        "type": "official",
+        "supports": ["Code Assistant and Agentic Platform seat prices", "BYO-LLM unlimited usage", "managed LLM cost plus service fee"],
+        "verifiedAt": AS_OF,
+    },
+    {
+        "id": "anthropic-claude-code-plans-2026",
+        "title": "Claude Code Pro and Max plans",
+        "publisher": "Anthropic",
+        "url": "https://support.claude.com/en/articles/11049741-what-is-the-max-plan",
+        "type": "official",
+        "supports": ["Pro, Max 5x and Max 20x prices", "five-hour and weekly shared limits", "relative plan multipliers"],
+        "verifiedAt": AS_OF,
+    },
+    {
+        "id": "factory-individual-pricing-2026",
+        "title": "Factory individual pricing",
+        "publisher": "Factory",
+        "url": "https://docs.factory.ai/pricing/individuals",
+        "type": "official",
+        "supports": ["Pro, Plus and Max prices", "relative 5x and 10x scaling", "five-hour, seven-day and thirty-day windows"],
+        "verifiedAt": AS_OF,
+    },
+    {
+        "id": "devin-desktop-quota-2026",
+        "title": "Devin Desktop account quotas",
+        "publisher": "Cognition",
+        "url": "https://docs.devin.ai/desktop/accounts/quota",
+        "type": "official",
+        "supports": ["Free, Pro and Max structure", "daily and weekly quota behavior", "shared Devin and Windsurf usage"],
+        "verifiedAt": AS_OF,
+    },
+    {
+        "id": "ollama-cloud-pricing-2026",
+        "title": "Ollama Cloud pricing",
+        "publisher": "Ollama",
+        "url": "https://ollama.com/pricing",
+        "type": "official",
+        "supports": ["Pro and Max prices", "relative usage multipliers", "concurrency", "model-weighted five-hour and weekly limits"],
+        "verifiedAt": AS_OF,
+    },
+    {
+        "id": "cline-pass-pricing-2026",
+        "title": "Cline Pass",
+        "publisher": "Cline",
+        "url": "https://cline.bot/cline-pass",
+        "type": "official",
+        "supports": ["introductory and recurring price", "advertised 2–5x API usage", "hidden five-hour, weekly and monthly buckets"],

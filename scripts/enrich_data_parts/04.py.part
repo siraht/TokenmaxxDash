@@ -1,0 +1,72 @@
+    for row in energy_models:
+        copy = dict(row)
+        copy["estimatedRequestsAtCurrentTrailingAverage"] = round(kwh * 1000 / row["averageWhPerRequest"])
+        model_estimates.append(copy)
+    included = kwh * 10
+    upsert(make_plan(
+        id=id_, provider_id="neural-watt", provider="Neuralwatt", name=name,
+        price=price, price_display=f"${price}/mo", status="exact", confidence="high",
+        allowance_type="metered GPU energy", headline=f"{kwh:g} kWh/month, followed by ${overage:.2f}/kWh overage.",
+        sources_=["neuralwatt-pricing-2026"], models=[row["model"] for row in energy_models],
+        unit="kWh of measured inference energy", plan_units=kwh,
+        quotas={"monthlyKwh": kwh, "overageUsdPerKwh": overage},
+        formula="included kWh × $10/kWh PAYG comparison; request estimates = included Wh / trailing-seven-day average Wh/request",
+        value_display=f"{included/price:.3g}× PAYG", value_multiple=included/price, included_value=included,
+        details={"paygUsdPerKwh": 10, "modelRequestEstimates": model_estimates, "measurementWarning": "Energy per request is a live trailing-seven-day fleet average and changes with request size, cache mix and routing."},
+        eligibility="api-and-coding-tools",
+        workload_eligibility={"interactiveCoding": True, "unattendedAutomation": True, "applicationBackend": True},
+    ))
+
+# Venice: explicit premium/API credit pool plus separate fair-use app access.
+remove_ids(["venice-pro"])
+for id_, name, price, credits, bank, prompts in [
+    ("venice-free", "Free", 0, 0, 0, "10 text prompts/day"),
+    ("venice-pro", "Pro", 18, 100, 0, "unlimited in-app text prompts"),
+    ("venice-pro-plus", "Pro Plus", 68, 7500, 2, "unlimited in-app text prompts"),
+    ("venice-max", "Max", 200, 22500, 3, "unlimited in-app text prompts"),
+]:
+    usd = credits / 100
+    multiple = usd / price if price else None
+    value = f"${usd:g} credits" if credits else prompts
+    upsert(make_plan(
+        id=id_, provider_id="venice", provider="Venice.ai", name=name, price=price, price_display="Free" if not price else f"${price}/mo",
+        status="exact", confidence="high", allowance_type="unlimited/fair-use app access plus universal credits",
+        headline=f"{prompts}; {credits:,} monthly premium/API credits" + (f" with {bank}-month banking." if bank else "."),
+        sources_=["venice-pricing-2026"], models=["Venice model catalog"], unit="Venice credit", plan_units=credits,
+        quotas={"monthlyCredits": credits, "creditsPerUsd": 100, "creditBankingMonths": bank, "textPrompts": prompts},
+        formula="explicit premium/API value = monthly credits / 100; unlimited app text remains a separate fair-use benefit",
+        value_display=value, value_multiple=multiple, included_value=usd if credits else None,
+        details={"annualDiscountPercent": 10 if name in {"Pro Plus", "Max"} else None},
+        eligibility="app-and-api",
+        workload_eligibility={"interactiveCoding": True, "unattendedAutomation": True if name in {"Pro Plus", "Max"} else "limited", "applicationBackend": True if name in {"Pro Plus", "Max"} else "limited"},
+    ))
+
+# Plans with published relative structure but hidden base buckets.
+def patch_plan(id_: str, **updates: Any) -> None:
+    p = by_id().get(id_)
+    if not p:
+        return
+    p.update(updates)
+
+for id_ in ["claude-code-pro", "claude-code-max-5x", "claude-code-max-20x"]:
+    factor = {"claude-code-pro": 1, "claude-code-max-5x": 5, "claude-code-max-20x": 20}[id_]
+    patch_plan(
+        id_, calculationStatus="measured-range", normalizationState="measured-range", exactness="measured-range",
+        valueDisplay=f"{factor}× relative tier · measured range", sourceIds=["anthropic-claude-code-plans-2026", "aa-claude-codex"],
+        bindingUnknowns=["Anthropic does not publish the absolute five-hour or weekly token-equivalent pool.", "Realized usage varies by model, cache mix, Claude chat usage and enforcement state."],
+        formula="official relative tier multiplier plus separately reported realized usage; no universal absolute quota is asserted",
+        details={**by_id()[id_].get("details", {}), "officialRelativeMultiplier": factor, "absolutePoolPublished": False},
+        headline=f"Official {factor}× relative tier with rolling five-hour and weekly caps; absolute pool remains provider-hidden.",
+    )
+
+for id_, factor in [("factory-pro", 1), ("factory-plus", 5), ("factory-max", 10)]:
+    patch_plan(id_, calculationStatus="partial", normalizationState="partial", exactness="partial", sourceIds=["factory-individual-pricing-2026"], valueDisplay=f"~{factor}× Pro relative", bindingUnknowns=["Absolute 5-hour, 7-day and 30-day pools are not published.", "Model multipliers are not fully published."], details={"relativeToPro": factor, "windows": ["5-hour", "7-day", "30-day"]})
+for id_ in ["devin-desktop-free", "devin-desktop-pro", "devin-desktop-max"]:
+    patch_plan(id_, calculationStatus="partial", normalizationState="partial", exactness="partial", sourceIds=["devin-desktop-quota-2026"], valueDisplay="Provider-hidden quota", bindingUnknowns=["The numerical daily and/or weekly pool is not published."], details={"sharedAcross": ["Devin sessions", "Devin Terminal", "Windsurf"]})
+for id_, factor, concurrency in [("ollama-cloud-pro", 50, 3), ("ollama-cloud-max", 250, 10)]:
+    patch_plan(id_, calculationStatus="partial", normalizationState="partial", exactness="partial", sourceIds=["ollama-cloud-pricing-2026"], valueDisplay=f"{factor}× Free relative", bindingUnknowns=["The base Free quota and model-level usage weights are not numerically published."], details={"relativeToFree": factor, "concurrentCloudModels": concurrency, "windows": ["5-hour", "weekly"], "signupState": "paused" if id_.endswith("max") else "available"})
+for id_ in ["google-ai-plus", "google-ai-pro", "google-ai-ultra-5x", "google-ai-ultra-20x"]:
+    factor = {"google-ai-plus": 1, "google-ai-pro": 2, "google-ai-ultra-5x": 5, "google-ai-ultra-20x": 20}[id_]
+    patch_plan(id_, calculationStatus="partial", normalizationState="partial", exactness="partial", sourceIds=["google-ai-plans-2026"], valueDisplay=f"{factor}× relative access", bindingUnknowns=["The base Antigravity and Jules work quota is product-specific and not published as one numerical pool."], details={"relativeAccessMultiplier": factor, "quotaRefresh": "approximately every five hours; product-specific"})
+for id_ in ["openai-codex-free", "openai-codex-go"]:
+    patch_plan(id_, calculationStatus="provider-hidden", normalizationState="provider-hidden", exactness="provider-hidden", valueDisplay="Provider-hidden pool", bindingUnknowns=["Token-credit rates are public, but this plan's included credit pool is not numerically published."], planDenominator="Codex weighted credit")

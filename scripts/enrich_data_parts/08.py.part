@@ -1,0 +1,91 @@
+            "estimatedAttemptsPerAverageMonth": round(attempts, 2),
+            "expectedBenchmarkPassesPerAverageMonth": round(passes, 2),
+            "subscriptionUsdPerExpectedPass": round(plan["priceMonthly"] / passes, 6) if passes else None,
+            "status": "evidence-derived",
+            "qualification": "Uses the measured Codex plan credit pool and the external benchmark's API-priced cost/task. Five-hour limits, shared ChatGPT usage and real task distributions can bind first.",
+        })
+
+value_eligible_routes = [route for route in quality_routes if route.get("rankingEligible")]
+access_eligible_routes = [route for route in quality_routes if route.get("accessRankingEligible")]
+mark_pareto(value_eligible_routes, score_key="intelligenceIndex", cost_key="planValueMultiple", flag="valueIntelligencePareto", minimize_cost=False)
+mark_pareto(access_eligible_routes, score_key="intelligenceIndex", cost_key="priceMonthly", flag="accessPriceIntelligencePareto", minimize_cost=True)
+
+# Leaders are Pareto sets, not a single arbitrary master score.
+def pick(rows: list[dict[str, Any]], flag: str, *, key: str, reverse: bool = True) -> list[dict[str, Any]]:
+    return sorted([r for r in rows if r.get(flag)], key=lambda r: (r.get(key) is not None, r.get(key) or -math.inf), reverse=reverse)
+
+leaders = {
+    "asOf": AS_OF,
+    "principle": "No universal scalar winner: publish non-dominated sets for quality, cost, speed, allowance and evidence confidence.",
+    "codingAgentCostQualityPareto": [r["id"] for r in pick(agent_index_rows, "costQualityPareto", key="score")],
+    "codingAgentTimeQualityPareto": [r["id"] for r in pick(agent_index_rows, "timeQualityPareto", key="score")],
+    "codingAgentTokenQualityPareto": [r["id"] for r in pick(agent_index_rows, "tokenQualityPareto", key="score")],
+    "modelPriceIntelligencePareto": [r["id"] for r in pick(model_rows, "priceIntelligencePareto", key="score")],
+    "modelSpeedIntelligencePareto": [r["id"] for r in pick(model_rows, "speedIntelligencePareto", key="score")],
+    "planModelValueIntelligencePareto": [r["id"] for r in pick(quality_routes, "valueIntelligencePareto", key="intelligenceIndex") if r.get("rankingEligible")],
+    "planAccessPriceIntelligencePareto": [r["id"] for r in pick(quality_routes, "accessPriceIntelligencePareto", key="intelligenceIndex") if r.get("accessRankingEligible")],
+    "subscriptionTaskEstimateCount": len(subscription_task_estimates),
+}
+
+# Candidate registry holds discoveries excluded from active rankings.
+candidates = [
+    {
+        "id": "ai-router", "name": "AI Router", "status": "unverified-candidate",
+        "reason": "Secondary trackers listed tiers, but no current primary product page or binding quota could be verified.",
+        "discoveredFromSourceIds": ["codingplans-cc"], "rankingEligible": False, "observedAt": AS_OF,
+    }
+]
+
+# Summary and methodology.
+provider_count = len({p["providerId"] for p in plans})
+status_counts: dict[str, int] = {}
+for p in plans:
+    status_counts[p["calculationStatus"]] = status_counts.get(p["calculationStatus"], 0) + 1
+quantified = [p for p in plans if isinstance(p.get("sortValue"), (int, float)) and (p.get("priceMonthly") or 0) > 0 and p.get("status") == "active"]
+quantified.sort(key=lambda p: p["sortValue"], reverse=True)
+summary = {
+    "asOf": AS_OF,
+    "planCount": len(plans), "providerCount": provider_count,
+    "exactOrDerivedCount": status_counts.get("exact", 0) + status_counts.get("derived", 0),
+    "partialCount": status_counts.get("partial", 0) + status_counts.get("secondary", 0) + status_counts.get("measured-range", 0),
+    "providerHiddenCount": status_counts.get("provider-hidden", 0),
+    "opaqueCount": 0,
+    "statusCounts": status_counts,
+    "externalBenchmarkRows": len(benchmarks), "modelRouteCount": len(models),
+    "directBenchmarkModelRouteCount": sum(1 for m in models if m["rankingEligible"]),
+    "qualityRouteCount": len(quality_routes), "subscriptionTaskEstimateCount": len(subscription_task_estimates),
+    "topNormalizedValue": {
+        "planId": quantified[0]["id"] if quantified else None,
+        "label": f"{quantified[0]['provider']} {quantified[0]['name']}" if quantified else None,
+        "multiple": quantified[0]["sortValue"] if quantified else None,
+        "qualification": "Highest quantified recurring-price multiple in the current data. It measures the plan's stated economic denominator, not model intelligence or task success.",
+    },
+    "topAnnualCommitmentValue": {
+        "planId": "stepfun-flash-max", "label": "StepFun Step Plan Flash Max (yearly)", "multiple": 69.334,
+        "qualification": "Published yearly commitment; still a nominal provider-rate subsidy rather than a task-quality result.",
+    },
+    "topMeasuredFrontierSubsidy": {
+        "planId": "openai-codex-pro-20x", "label": "OpenAI Codex Pro 20x", "multiple": 46.612,
+        "qualification": "Largest cleanly measured frontier-subscription API-equivalent pool in the current evidence set; the weekly pool is inferred rather than officially published.",
+    },
+    "topMeasuredSubsidy": {
+        "planId": quantified[0]["id"] if quantified else None, "label": f"{quantified[0]['provider']} {quantified[0]['name']}" if quantified else None,
+        "multiple": quantified[0]["sortValue"] if quantified else None,
+        "qualification": "Compatibility alias; use the Pareto leader sets for decision-making.",
+    },
+    "topTransparentPlans": [{"id": p["id"], "label": f"{p['provider']} {p['name']}", "valueDisplay": p["valueDisplay"], "status": p["calculationStatus"]} for p in quantified[:12]],
+}
+methodology["asOf"] = AS_OF
+methodology["calculationStatuses"] = {
+    "exact": "Official numerical allowance and formula are sufficient for direct calculation in the provider's own unit.",
+    "derived": "Official formula combined with a reproducible measured or officially illustrated hidden variable.",
+    "measured-range": "Official plan mechanics plus observed realized-use evidence, but no stable universal absolute pool.",
+    "partial": "At least one useful number is exact while another binding bucket, multiplier or route remains hidden.",
+    "provider-hidden": "The provider withholds the binding numerical pool; the plan is cataloged without a guessed value.",
+    "secondary": "A current field materially depends on a comparison tracker pending primary confirmation.",
+    "unverified-candidate": "Discovery record excluded from active rankings until a primary product and quota can be verified.",
+    "legacy": "Discontinued or historical plan retained only for time-aware comparison.",
+}
+methodology["formulas"].update({
+    "agentApiUsdPerExpectedPass": "external API cost per task / (external benchmark score / 100); valid only when the score is a pass-rate-like percentage",
+    "modelUsdPerIntelligencePoint": "7:2:1 blended API price per 1M tokens / Intelligence Index; an economic signal, not an expected pass probability",

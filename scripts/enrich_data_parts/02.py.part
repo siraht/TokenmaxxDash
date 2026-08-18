@@ -1,0 +1,174 @@
+        "verifiedAt": AS_OF,
+    },
+    {
+        "id": "fireworks-fire-pass-2026",
+        "title": "Fireworks Fire Pass",
+        "publisher": "Fireworks AI",
+        "url": "https://fireworks.ai/fire-pass",
+        "type": "official",
+        "supports": ["single invite-only fair-use product", "included model route", "personal non-production restriction"],
+        "verifiedAt": AS_OF,
+    },
+    {
+        "id": "google-ai-plans-2026",
+        "title": "Google AI plans",
+        "publisher": "Google",
+        "url": "https://one.google.com/about/google-ai-plans/",
+        "type": "official",
+        "supports": ["Plus, Pro and Ultra prices", "relative Antigravity/Jules access multipliers", "product-specific quotas"],
+        "verifiedAt": AS_OF,
+    },
+    {
+        "id": "xai-supergrok-plans-2026",
+        "title": "Grok subscription plans",
+        "publisher": "xAI",
+        "url": "https://grok.com/plans",
+        "type": "official",
+        "supports": ["Free, SuperGrok and Heavy tiers", "shared product compute", "provider-hidden weekly pool"],
+        "verifiedAt": AS_OF,
+    },
+    {
+        "id": "aa-intelligence-index-v4-1",
+        "title": "Artificial Analysis Intelligence Index v4.1 model results",
+        "publisher": "Artificial Analysis",
+        "url": "https://artificialanalysis.ai/models",
+        "type": "external-benchmark",
+        "supports": ["model intelligence scores", "input/cache/output prices", "output speed and latency"],
+        "verifiedAt": AS_OF,
+    },
+]
+for source in OFFICIAL_SOURCES:
+    add_source(source)
+
+
+def by_id() -> dict[str, dict[str, Any]]:
+    return {p["id"]: p for p in plans}
+
+
+def remove_ids(ids: Iterable[str]) -> None:
+    global plans
+    wanted = set(ids)
+    plans = [p for p in plans if p["id"] not in wanted]
+
+
+def upsert(plan: dict[str, Any]) -> None:
+    global plans
+    idx = next((i for i, row in enumerate(plans) if row["id"] == plan["id"]), None)
+    if idx is None:
+        plans.append(plan)
+    else:
+        merged = deepcopy(plans[idx])
+        merged.update(plan)
+        plans[idx] = merged
+
+
+def make_plan(
+    *,
+    id: str,
+    provider_id: str,
+    provider: str,
+    name: str,
+    price: float | None,
+    price_display: str,
+    status: str,
+    confidence: str,
+    allowance_type: str,
+    headline: str,
+    sources_: list[str],
+    models: list[str],
+    unit: str | None,
+    plan_units: float | int | None,
+    quotas: dict[str, Any],
+    formula: str | None,
+    value_display: str,
+    value_multiple: float | None = None,
+    included_value: float | None = None,
+    region: str = "Global",
+    currency: str = "USD",
+    eligibility: str = "interactive-coding",
+    details: dict[str, Any] | None = None,
+    notes: list[str] | None = None,
+    product_status: str = "active",
+    binding_unknowns: list[str] | None = None,
+    workload_eligibility: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    return {
+        "id": id,
+        "providerId": provider_id,
+        "provider": provider,
+        "name": name,
+        "priceMonthly": price,
+        "currency": currency,
+        "category": "coding-subscription",
+        "status": product_status,
+        "region": region,
+        "calculationStatus": status,
+        "normalizationState": status,
+        "confidence": confidence,
+        "allowanceType": allowance_type,
+        "headline": headline,
+        "sourceIds": sources_,
+        "valueMultiple": value_multiple,
+        "valueMultipleLow": None,
+        "valueMultipleHigh": None,
+        "sortValue": value_multiple,
+        "includedValueUsdMonthly": included_value,
+        "formula": formula,
+        "quotas": quotas,
+        "models": models,
+        "notes": notes or [],
+        "eligibility": eligibility,
+        "workloadEligibility": workload_eligibility or {
+            "interactiveCoding": True,
+            "unattendedAutomation": "unknown",
+            "applicationBackend": "unknown",
+        },
+        "exactness": status,
+        "unit": unit,
+        "planUnits": plan_units,
+        "details": details or {},
+        "bindingUnknowns": binding_unknowns or [],
+        "planDenominator": unit,
+        "routeConfidence": "direct" if models else "catalog",
+        "effectiveAt": AS_OF,
+        "observedAt": AS_OF,
+        "lastVerified": AS_OF,
+        "priceDisplay": price_display,
+        "valueDisplay": value_display,
+    }
+
+
+# Every legacy opaque row becomes explicitly provider-hidden unless a stronger correction below applies.
+for p in plans:
+    if p.get("calculationStatus") == "opaque":
+        p["calculationStatus"] = "provider-hidden"
+        p["exactness"] = "provider-hidden"
+        p["normalizationState"] = "provider-hidden"
+        p["bindingUnknowns"] = ["The provider does not publish the numerical binding allowance or deduction table."]
+        p["valueDisplay"] = "Provider-hidden limit"
+
+# Remove a tracker-only product with no verifiable primary product identity from the active catalog.
+remove_ids(["ai-router-developer", "ai-router-pro", "ai-router-max"])
+
+# Amazon Q Developer: exact monthly request/work-unit quotas.
+upsert(make_plan(
+    id="amazon-q-free", provider_id="amazon-q", provider="Amazon Q Developer", name="Free",
+    price=0, price_display="Free", status="exact", confidence="high",
+    allowance_type="agentic requests and transformation LOC",
+    headline="50 agentic requests and 1,000 transformation lines of code per month.",
+    sources_=["amazon-q-developer-pricing-2026", "amazon-q-developer-quotas-2026"],
+    models=["Claude models"], unit="agentic request", plan_units=50,
+    quotas={"monthlyAgenticRequests": 50, "monthlyTransformationLoc": 1000},
+    formula="published monthly request and transformation allowances; request complexity is not normalized to tokens",
+    value_display="50 requests/mo", details={"inferenceCalls": None},
+))
+upsert(make_plan(
+    id="amazon-q-pro", provider_id="amazon-q", provider="Amazon Q Developer", name="Pro",
+    price=19, price_display="$19/mo", status="exact", confidence="high",
+    allowance_type="inference calls, user inputs and transformation LOC",
+    headline="10,000 inference calls/month, approximately 1,000 user inputs, and 4,000 transformation LOC.",
+    sources_=["amazon-q-developer-pricing-2026", "amazon-q-developer-quotas-2026"],
+    models=["Claude models"], unit="inference call", plan_units=10000,
+    quotas={"monthlyInferenceCalls": 10000, "approxMonthlyUserInputs": 1000, "monthlyTransformationLoc": 4000, "monthlyCodeCatalystAgentInvocations": 30, "monthlyPullRequestSummaries": 20},
+    formula="published monthly inference-call allowance; AWS estimates roughly ten inference calls per user input",
+    value_display="10,000 calls/mo", details={"approxCallsPerUserInput": 10, "extraTransformationLocUsd": 0.003},

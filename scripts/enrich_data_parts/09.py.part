@@ -1,0 +1,31 @@
+    "qualityAdjustedSubsidySignal": "plan value multiple × Intelligence Index / 100; a labeled heuristic used only for Pareto display, never as a universal winner score",
+    "subscriptionUsdPerIntelligencePoint": "monthly subscription price / directly matched Intelligence Index; access-price density only, independent of allowance size",
+    "subscriptionUsdPerQualityAdjustedValueDollar": "1 / (plan value multiple × Intelligence Index / 100); heuristic subscription dollars per intelligence-weighted provider-value dollar",
+    "subscriptionBenchmarkPasses": "included API-equivalent monthly value / external API cost per task × external pass-rate-like score; only for a directly tested native route",
+})
+methodology["principles"] = [
+    "Use Pareto frontiers instead of one arbitrary weighted winner: quality, cost, speed, allowance and evidence confidence stay separate.",
+    "Every advertised model route gets a coverage record; routes without a direct external result are labeled rather than assigned a proxy score.",
+    "A model Intelligence Index is not a pass probability and is never converted into expected tasks.",
+    "Expected benchmark passes per month are calculated only where the native tested route and a quantified plan denominator can be joined defensibly.",
+    "Provider-hidden limits remain provider-hidden. Filling the record means identifying the missing denominator and evidence, not inventing it.",
+    "Only externally published benchmarks are present in this release; future community runs remain a separate evidence lane.",
+]
+
+plans.sort(key=lambda p: (p["provider"].lower(), p.get("priceMonthly") if p.get("priceMonthly") is not None else math.inf, p["name"].lower()))
+benchmarks.sort(key=lambda b: (b.get("kind", ""), b.get("benchmark", ""), -(b.get("score") or 0), b["id"]))
+sources.sort(key=lambda s: (s["type"], s["publisher"].lower(), s["id"]))
+quality_routes.sort(key=lambda r: (-(r.get("intelligenceIndex") or 0), -(r.get("planValueMultiple") or -1), r["id"]))
+subscription_task_estimates.sort(key=lambda r: (r["planId"], -(r["score"]), r["model"]))
+
+write("plans.json", plans)
+write("benchmarks.json", benchmarks)
+write("sources.json", sources)
+write("summary.json", summary)
+write("methodology.json", methodology)
+write("models.json", models)
+write("quality-routes.json", quality_routes)
+write("subscription-task-estimates.json", subscription_task_estimates)
+write("leaders.json", leaders)
+write("candidates.json", candidates)
+print(f"Enriched {len(plans)} plans, {len(models)} advertised model routes, {len(benchmarks)} external benchmark rows and {len(quality_routes)} direct plan/model quality routes.")

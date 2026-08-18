@@ -1,0 +1,86 @@
+patch_plan("cline-cline-pass", calculationStatus="partial", normalizationState="partial", exactness="partial", sourceIds=["cline-pass-pricing-2026"], valueDisplay="2–5× advertised; pool hidden", bindingUnknowns=["The absolute five-hour, weekly and monthly pools are not published.", "The advertised 2–5× varies by model and workload."], details={"advertisedApiValueMultiplierRange": [2, 5]})
+for id_ in ["tabnine-code-assistant", "tabnine-agentic-platform"]:
+    patch_plan(id_, calculationStatus="partial", normalizationState="partial", exactness="partial", sourceIds=["tabnine-pricing-2026"], valueDisplay="Seat + BYO inference", allowanceType="coding harness seat; BYO or reserved model usage", headline="Seat subscription is exact; unlimited usage applies to the customer's own LLM endpoint, while Tabnine-hosted inference uses a reserved token quota and service margin.", bindingUnknowns=["The included Tabnine-hosted reserved token quota is not publicly quantified."], details={"byoLlmUnlimited": True, "managedModelServiceFeePercent": 5})
+
+# Replace stale Fire Pass tracker tiers with the currently documented single product.
+remove_ids(["fireworks-fire-pass-developer", "fireworks-fire-pass-power"])
+upsert(make_plan(
+    id="fireworks-fire-pass", provider_id="fireworks-fire-pass", provider="Fireworks Fire Pass", name="Fire Pass",
+    price=49, price_display="$49/mo last observed · invite-only", status="provider-hidden", confidence="medium",
+    allowance_type="fair-use flat-rate model route", headline="Invite-only personal coding pass with a provider-managed fair-use envelope and no per-token charge on the included route.",
+    sources_=["fireworks-fire-pass-2026"], models=["Kimi K3 Fast"], unit="fair-use request", plan_units=None, quotas={}, formula=None,
+    value_display="Provider-hidden fair use", product_status="invite-only",
+    binding_unknowns=["Current throughput and fair-use thresholds are not published.", "The currently displayed price may differ from the last indexed $49/month price."],
+    eligibility="personal-non-production-coding",
+    workload_eligibility={"interactiveCoding": True, "unattendedAutomation": False, "applicationBackend": False},
+))
+
+# Replace stale xAI tier names with current public consumer tiers.
+remove_ids(["xai-grok-basic", "xai-grok-supergrok", "xai-grok-pro", "xai-grok-heavy"])
+for id_, name, price, factor in [("xai-grok-free", "Free", 0, None), ("xai-grok-supergrok", "SuperGrok", 30, 1), ("xai-grok-heavy", "Heavy", 300, None)]:
+    upsert(make_plan(
+        id=id_, provider_id="xai-grok", provider="xAI Grok Build", name=name, price=price, price_display="Free" if not price else f"~${price}/mo",
+        status="provider-hidden", confidence="medium", allowance_type="shared weekly compute",
+        headline="Grok Build shares a provider-managed weekly compute pool with other Grok surfaces; the absolute pool and model weights are hidden.",
+        sources_=["xai-supergrok-plans-2026"], models=["Grok coding models"], unit="shared compute unit", plan_units=None, quotas={}, formula=None,
+        value_display="Provider-hidden compute", binding_unknowns=["Absolute weekly compute pool", "Per-model and per-surface weighting"],
+    ))
+
+# Canonical status fields and readable denominator labels for every remaining plan.
+def replace_legacy_unknown_label(value: Any) -> Any:
+    if isinstance(value, str):
+        return re.sub(r"\bopaque\b", "provider-hidden", value, flags=re.I)
+    if isinstance(value, list):
+        return [replace_legacy_unknown_label(item) for item in value]
+    if isinstance(value, dict):
+        return {key: replace_legacy_unknown_label(item) for key, item in value.items()}
+    return value
+
+plans = [replace_legacy_unknown_label(plan) for plan in plans]
+sources = [replace_legacy_unknown_label(source) for source in sources]
+
+for p in plans:
+    p.setdefault("normalizationState", p.get("calculationStatus", "secondary"))
+    p.setdefault("bindingUnknowns", [])
+    p.setdefault("planDenominator", p.get("unit"))
+    p.setdefault("routeConfidence", "direct" if p.get("models") else "catalog")
+    p.setdefault("effectiveAt", p.get("lastVerified", AS_OF))
+    p.setdefault("observedAt", AS_OF)
+    p.setdefault("workloadEligibility", {
+        "interactiveCoding": p.get("eligibility") in {"interactive-coding", "interactive-coding-only", "api-and-coding-tools"},
+        "unattendedAutomation": "unknown",
+        "applicationBackend": "unknown",
+    })
+    if p.get("calculationStatus") == "opaque":
+        raise RuntimeError(f"opaque status survived enrichment: {p['id']}")
+    if not p.get("valueDisplay") or p.get("valueDisplay") == "Unresolved":
+        p["valueDisplay"] = {
+            "provider-hidden": "Provider-hidden limit",
+            "partial": "Partial normalization",
+            "secondary": "Secondary evidence",
+            "measured-range": "Measured range",
+            "legacy": "Legacy plan",
+        }.get(p.get("calculationStatus"), "Unit allowance")
+    if p.get("includedValueUsdMonthly") is None and p.get("planUnits") is not None and p["valueDisplay"] in {"Partial normalization", "Secondary evidence", "Unit allowance"}:
+        p["valueDisplay"] = f"{p['planUnits']:,} {p.get('unit') or 'plan units'}"
+
+# External model-intelligence snapshot. Prices are $/1M tokens; blended uses 70% cache, 20% fresh input, 10% output.
+def model_row(id_: str, provider: str, model: str, score: float, input_: float, cache: float, output: float, speed: float | None, ttft: float | None = None, notes: str | None = None) -> dict[str, Any]:
+    blended = 0.7 * cache + 0.2 * input_ + 0.1 * output
+    return {
+        "id": id_, "kind": "model-intelligence", "benchmark": "Artificial Analysis Intelligence Index", "version": "v4.1",
+        "provider": provider, "model": model, "score": score,
+        "inputPricePerMUsd": input_, "cachedInputPricePerMUsd": cache, "outputPricePerMUsd": output,
+        "blendedPricePerMUsd": round(blended, 6), "outputTokensPerSecond": speed, "timeToFirstTokenSeconds": ttft,
+        "sourceId": "aa-intelligence-index-v4-1", "retrievedAt": AS_OF,
+        "costMeaning": "Artificial Analysis 7:2:1 cache/fresh-input/output blended model price; not a subscription allocation.",
+        "notes": notes,
+    }
+
+model_rows = [
+    model_row("aa-model-claude-opus-5-max", "Anthropic", "Claude Opus 5 (max)", 61, 5, 0.5, 25, 54),
+    model_row("aa-model-gpt-5-6-sol-max", "OpenAI", "GPT-5.6 Sol (max)", 59, 5, 0.5, 30, 70),
+    model_row("aa-model-gpt-5-6-sol-xhigh", "OpenAI", "GPT-5.6 Sol (xhigh)", 58, 5, 0.5, 30, 68.1),
+    model_row("aa-model-kimi-k3-max", "Moonshot AI", "Kimi K3 (max)", 57, 3, 0.3, 15, 33.8, 3.78),
+    model_row("aa-model-gpt-5-6-terra-max", "OpenAI", "GPT-5.6 Terra (max)", 55, 2.5, 0.25, 15, 136.8),
+    model_row("aa-model-grok-4-5-high", "xAI", "Grok 4.5 (high)", 54, 2, 0.5, 6, 59.1),

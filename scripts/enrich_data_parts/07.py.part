@@ -1,0 +1,102 @@
+        plan_models.setdefault(canonicalize(model), []).append(plan["id"])
+
+model_benchmark_map: dict[str, list[dict[str, Any]]] = {}
+agent_benchmark_map: dict[str, list[dict[str, Any]]] = {}
+for row in benchmarks:
+    key = base_benchmark_model(row["model"])
+    if row["kind"] == "model-intelligence":
+        model_benchmark_map.setdefault(key, []).append(row)
+    elif row.get("benchmark") == "Artificial Analysis Coding Agent Index":
+        agent_benchmark_map.setdefault(key, []).append(row)
+
+broad_markers = ("catalog", "models", "family", "managed", "frontier third-party", "multi-model", "bundled", "other ")
+models: list[dict[str, Any]] = []
+for canonical, plan_ids in sorted(plan_models.items(), key=lambda item: item[0].lower()):
+    broad = any(marker in canonical.lower() for marker in broad_markers)
+    direct_model_rows = model_benchmark_map.get(base_benchmark_model(canonical), [])
+    direct_agent_rows = agent_benchmark_map.get(base_benchmark_model(canonical), [])
+    if broad:
+        coverage = "catalog-only"
+    elif direct_model_rows and direct_agent_rows:
+        coverage = "direct-agent-and-model"
+    elif direct_model_rows:
+        coverage = "direct-model"
+    elif direct_agent_rows:
+        coverage = "direct-agent"
+    else:
+        coverage = "no-external-benchmark"
+    best_model = max(direct_model_rows, key=lambda r: r["score"], default=None)
+    best_agent = max(direct_agent_rows, key=lambda r: r["score"], default=None)
+    record = {
+        "id": slug(canonical), "name": canonical, "canonicalName": canonical,
+        "planIds": sorted(set(plan_ids)), "planCount": len(set(plan_ids)),
+        "benchmarkCoverage": coverage,
+        "rankingEligible": bool(direct_model_rows or direct_agent_rows) and not broad,
+        "directModelBenchmarkIds": [r["id"] for r in direct_model_rows],
+        "directAgentBenchmarkIds": [r["id"] for r in direct_agent_rows],
+        "bestModelIntelligenceScore": best_model.get("score") if best_model else None,
+        "bestModelBlendedPricePerMUsd": best_model.get("blendedPricePerMUsd") if best_model else None,
+        "blendedUsdPerIntelligencePoint": best_model.get("blendedUsdPerIntelligencePoint") if best_model else None,
+        "bestCodingAgentScore": best_agent.get("score") if best_agent else None,
+        "bestCodingAgentApiCostPerTaskUsd": best_agent.get("apiCostPerTaskUsd") if best_agent else None,
+        "apiUsdPerExpectedPass": best_agent.get("apiUsdPerExpectedPass") if best_agent else None,
+        "exclusionReason": "Broad catalog or managed-agent label is not a model checkpoint." if broad else (None if direct_model_rows or direct_agent_rows else "No direct external result in the current imported snapshot."),
+        "asOf": AS_OF,
+    }
+    models.append(record)
+
+model_lookup = {m["canonicalName"]: m for m in models}
+for plan in plans:
+    coverage = [model_lookup[canonicalize(m)]["benchmarkCoverage"] for m in plan.get("models", []) if canonicalize(m) in model_lookup]
+    rank = {"direct-agent-and-model": 4, "direct-agent": 3, "direct-model": 2, "no-external-benchmark": 1, "catalog-only": 0}
+    plan["benchmarkCoverage"] = max(coverage, key=lambda x: rank[x]) if coverage else "catalog-only"
+    plan["modelCoverageIds"] = [model_lookup[canonicalize(m)]["id"] for m in plan.get("models", []) if canonicalize(m) in model_lookup]
+
+# Plan/model quality signals. Only exact direct model matches are allowed into route-level ranking.
+quality_routes: list[dict[str, Any]] = []
+for plan in plans:
+    for advertised in plan.get("models", []):
+        canonical = canonicalize(advertised)
+        model_record = model_lookup.get(canonical)
+        if not model_record or not model_record.get("bestModelIntelligenceScore"):
+            continue
+        score = model_record["bestModelIntelligenceScore"]
+        route = {
+            "id": f"{plan['id']}--{model_record['id']}",
+            "planId": plan["id"], "provider": plan["provider"], "plan": plan["name"],
+            "modelId": model_record["id"], "model": canonical,
+            "priceMonthly": plan.get("priceMonthly"), "intelligenceIndex": score,
+            "blendedPricePerMUsd": model_record.get("bestModelBlendedPricePerMUsd"),
+            "blendedUsdPerIntelligencePoint": model_record.get("blendedUsdPerIntelligencePoint"),
+            "planValueMultiple": plan.get("valueMultiple"),
+            "planValueDisplay": plan.get("valueDisplay"),
+            "planCalculationStatus": plan.get("calculationStatus"),
+            "subscriptionUsdPerIntelligencePoint": round(plan["priceMonthly"] / score, 6) if isinstance(plan.get("priceMonthly"), (int, float)) and plan["priceMonthly"] >= 0 else None,
+            "intelligencePointsPerSubscriptionDollar": round(score / plan["priceMonthly"], 6) if isinstance(plan.get("priceMonthly"), (int, float)) and plan["priceMonthly"] > 0 else None,
+            "qualityAdjustedSubsidySignal": round(plan["valueMultiple"] * score / 100, 6) if isinstance(plan.get("valueMultiple"), (int, float)) else None,
+            "subscriptionUsdPerQualityAdjustedValueDollar": round(1 / (plan["valueMultiple"] * score / 100), 8) if isinstance(plan.get("valueMultiple"), (int, float)) and plan["valueMultiple"] > 0 else None,
+            "benchmarkTransfer": "direct model checkpoint; agent/harness performance remains separate",
+            "rankingEligible": plan.get("status") == "active" and plan.get("valueMultiple") is not None,
+            "accessRankingEligible": plan.get("status") == "active" and isinstance(plan.get("priceMonthly"), (int, float)) and plan["priceMonthly"] >= 0,
+            "asOf": AS_OF,
+        }
+        quality_routes.append(route)
+
+# Native Codex subscription capacity using externally published native Codex benchmark costs.
+subscription_task_estimates: list[dict[str, Any]] = []
+for plan in plans:
+    if plan["providerId"] != "openai-codex" or not isinstance(plan.get("includedValueUsdMonthly"), (int, float)):
+        continue
+    for row in agent_index_rows:
+        if row.get("agent") != "Codex" or not row["model"].startswith(("GPT-5.6 Sol", "GPT-5.6 Terra", "GPT-5.6 Luna")):
+            continue
+        cost = row.get("apiCostPerTaskUsd")
+        if not isinstance(cost, (int, float)) or cost <= 0:
+            continue
+        attempts = plan["includedValueUsdMonthly"] / cost
+        passes = attempts * row["score"] / 100
+        subscription_task_estimates.append({
+            "id": f"{plan['id']}--{row['id']}", "planId": plan["id"], "benchmarkId": row["id"],
+            "provider": plan["provider"], "plan": plan["name"], "agent": row["agent"], "model": row["model"],
+            "benchmark": row["benchmark"], "benchmarkVersion": row["version"], "score": row["score"],
+            "includedApiEquivalentUsdMonthly": plan["includedValueUsdMonthly"],
