@@ -10,7 +10,7 @@
     "build": "npm run check:data && astro build",
     "preview": "astro preview",
     "check": "astro check",
-    "check:data": "node scripts/validate-data.mjs",
+    "check:data": "node scripts/validate-data.mjs && node scripts/validate-external-benchmarks.mjs",
     "check:sources": "python3 scripts/check_astro_sources.py",
     "prepare:data": "npm run refresh:data && npm run sync:data",
     "sync:data": "python3 scripts/sync_public_data.py",
