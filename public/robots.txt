@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://coding-plan-index.pages.dev/sitemap-index.xml

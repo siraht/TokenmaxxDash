@@ -1,0 +1,46 @@
+---
+import Nav from '../components/Nav.astro';
+import '../styles/global.css';
+
+interface Props {
+  title: string;
+  description?: string;
+  canonical?: string;
+}
+
+const {
+  title,
+  description = 'An evidence-weighted comparison of AI coding subscriptions, provider-hidden limits, model intelligence, task economics, and Pareto leaders.',
+  canonical
+} = Astro.props;
+const pageTitle = title === 'Tokenmaxx' ? title : `${title} · Tokenmaxx`;
+const canonicalUrl = canonical || new URL(Astro.url.pathname, Astro.site || Astro.url.origin).toString();
+---
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width" />
+    <meta name="description" content={description} />
+    <meta name="theme-color" content="#0a0e13" />
+    <link rel="canonical" href={canonicalUrl} />
+    <title>{pageTitle}</title>
+  </head>
+  <body>
+    <div class="page-shell">
+      <Nav />
+      <main><slot /></main>
+      <footer class="site-footer">
+        <p>Evidence snapshot: 17 August 2026. Provider-hidden limits stay hidden; no guessed pools enter rankings.</p>
+        <div>
+          <a href="/data/plans.json">Plans JSON</a>
+          <a href="/data/benchmarks.json">Benchmarks JSON</a>
+          <a href="/data/models.json">Models JSON</a>
+          <a href="/data/leaders.json">Leaders JSON</a>
+          <a href="/schema/community-benchmark-submission.schema.json">Contribution schema</a>
+        </div>
+      </footer>
+    </div>
+    <script src="/app.js" defer></script>
+  </body>
+</html>

@@ -1,0 +1,37 @@
+---
+const path = Astro.url.pathname;
+const links = [
+  ['/', 'Overview'],
+  ['/leaders', 'Pareto leaders'],
+  ['/plans', 'Plans'],
+  ['/models', 'Models'],
+  ['/benchmarks', 'External benchmarks'],
+  ['/methodology', 'Methodology'],
+  ['/community', 'Community runs'],
+  ['/sources', 'Evidence']
+];
+---
+<header class="site-header">
+  <a class="brand" href="/" aria-label="Tokenmaxx home">
+    <span class="brand-mark" aria-hidden="true">TMX</span>
+    <span>
+      <strong>Tokenmaxx</strong>
+      <small>Evidence-weighted coding-plan economics</small>
+    </span>
+  </a>
+  <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav">Menu</button>
+  <nav id="site-nav" class="site-nav" aria-label="Primary navigation">
+    {links.map(([href, label]) => (
+      <a href={href} aria-current={path === href || (href !== '/' && path.startsWith(href)) ? 'page' : undefined}>{label}</a>
+    ))}
+  </nav>
+</header>
+<script is:inline>
+  const toggle = document.querySelector('.nav-toggle');
+  const nav = document.querySelector('#site-nav');
+  toggle?.addEventListener('click', () => {
+    const open = toggle.getAttribute('aria-expanded') === 'true';
+    toggle.setAttribute('aria-expanded', String(!open));
+    nav?.classList.toggle('is-open', !open);
+  });
+</script>

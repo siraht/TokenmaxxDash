@@ -1,0 +1,233 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://coding-plan-index.example/schema/community-benchmark-submission.schema.json",
+  "title": "Community Coding Benchmark Submission",
+  "description": "A reproducible external benchmark run contributed by a community member. The current dashboard does not execute benchmarks itself.",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "benchmark",
+    "plan",
+    "model",
+    "run",
+    "artifacts",
+    "attestations"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0.0"
+    },
+    "submittedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "contributor": {
+      "type": "object",
+      "properties": {
+        "handle": {
+          "type": "string"
+        },
+        "contact": {
+          "type": "string"
+        }
+      }
+    },
+    "benchmark": {
+      "type": "object",
+      "required": [
+        "name",
+        "version",
+        "taskSetSha256",
+        "harnessUrl",
+        "harnessCommit"
+      ],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        },
+        "taskSetSha256": {
+          "type": "string",
+          "pattern": "^[a-fA-F0-9]{64}$"
+        },
+        "harnessUrl": {
+          "type": "string",
+          "format": "uri"
+        },
+        "harnessCommit": {
+          "type": "string"
+        },
+        "evaluator": {
+          "type": "string"
+        }
+      }
+    },
+    "plan": {
+      "type": "object",
+      "required": [
+        "provider",
+        "planName",
+        "authenticationMode"
+      ],
+      "properties": {
+        "provider": {
+          "type": "string"
+        },
+        "planName": {
+          "type": "string"
+        },
+        "planVersionObservedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "authenticationMode": {
+          "enum": [
+            "subscription",
+            "api",
+            "sponsored",
+            "other"
+          ]
+        }
+      }
+    },
+    "model": {
+      "type": "object",
+      "required": [
+        "advertisedAlias"
+      ],
+      "properties": {
+        "advertisedAlias": {
+          "type": "string"
+        },
+        "resolvedModelId": {
+          "type": "string"
+        },
+        "reasoningEffort": {
+          "type": "string"
+        },
+        "speedMode": {
+          "type": "string"
+        }
+      }
+    },
+    "environment": {
+      "type": "object",
+      "properties": {
+        "os": {
+          "type": "string"
+        },
+        "architecture": {
+          "type": "string"
+        },
+        "region": {
+          "type": "string"
+        },
+        "containerImageDigest": {
+          "type": "string"
+        }
+      }
+    },
+    "run": {
+      "type": "object",
+      "required": [
+        "taskCount",
+        "attemptCount",
+        "passedCount",
+        "wallTimeSeconds"
+      ],
+      "properties": {
+        "taskCount": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "attemptCount": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "passedCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "wallTimeSeconds": {
+          "type": "number",
+          "minimum": 0
+        },
+        "apiCostEquivalentUsd": {
+          "type": "number",
+          "minimum": 0
+        },
+        "uncachedInputTokens": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "cachedInputTokens": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "outputTokens": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "reasoningTokensSubset": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "artifacts": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "url",
+          "sha256",
+          "type"
+        ],
+        "properties": {
+          "url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[a-fA-F0-9]{64}$"
+          },
+          "type": {
+            "enum": [
+              "raw-log",
+              "summary",
+              "verifier-output",
+              "environment-lock",
+              "other"
+            ]
+          }
+        }
+      }
+    },
+    "attestations": {
+      "type": "object",
+      "required": [
+        "tasksUnmodified",
+        "allAttemptsIncluded",
+        "secretsRemoved"
+      ],
+      "properties": {
+        "tasksUnmodified": {
+          "const": true
+        },
+        "allAttemptsIncluded": {
+          "const": true
+        },
+        "secretsRemoved": {
+          "const": true
+        },
+        "notes": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}
