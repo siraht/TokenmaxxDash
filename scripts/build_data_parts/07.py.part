@@ -1,0 +1,87 @@
+        sources_=["github-copilot-plans", "github-copilot-model-rates"], value_multiple=q(value/Decimal(price), "0.001"), included_value_usd=q(value),
+        formula="token cost at the selected model's current rate is converted to AI credits; 1 AI credit = $0.01",
+        quotas={"monthlyAiCredits": credits}, models=["GitHub-supported model catalog"],
+        notes=["Unused credits reset monthly; existing annual legacy plans can still use the old request system."],
+        unit="GitHub AI credit", plan_units=credits,
+    ))
+for name, price, credits in [("Business", 19, 1900), ("Enterprise", 39, 3900)]:
+    plans.append(make_plan(
+        "GitHub Copilot", name, price, provider_id="github-copilot", category="team-coding-subscription",
+        calculation_status="exact", confidence="high", allowance_type="token-priced AI credits",
+        headline=f"{credits:,} AI credits/user/month = ${credits/100:.2f} token-rated value.",
+        sources_=["github-copilot-model-rates"], value_multiple=1.0, included_value_usd=credits/100,
+        formula="1 AI credit = $0.01 of model token usage", quotas={"monthlyAiCredits": credits}, unit="GitHub AI credit", plan_units=credits,
+    ))
+
+# ---- Kiro exact credits, opaque work-unit deduction ----
+for name, price, credits in [("Pro", 20, 1000), ("Pro+", 40, 2000), ("Pro Max", 100, 5000), ("Power", 200, 10000)]:
+    overage_value = Decimal(credits) * Decimal("0.04")
+    plans.append(make_plan(
+        "Kiro", name, price, provider_id="kiro", calculation_status="exact", confidence="high",
+        allowance_type="agent work credits", headline=f"{credits:,} credits/month; replacement value ${q(overage_value)} at $0.04/credit.",
+        sources_=["kiro-pricing"], value_multiple=q(overage_value/Decimal(price), "0.001"), included_value_usd=q(overage_value),
+        formula="included credits × $0.04 overage price; task deduction itself is fractional and complexity-dependent",
+        quotas={"monthlyCredits": credits, "overageUsdPerCredit": 0.04}, models=["Kiro model catalog"],
+        notes=["The 2x value multiple is an overage-equivalent measure, not an API-token equivalent."], unit="Kiro credit", plan_units=credits,
+    ))
+
+# ---- Kilo pass mature and annual effective values ----
+for name, price in [("Kilo Pass", 19), ("Kilo Pass Plus", 49), ("Kilo Pass Ultra", 199)]:
+    mature = Decimal(price) * Decimal("1.4")
+    annual = Decimal(price) * Decimal("1.5")
+    plans.append(make_plan(
+        "Kilo Code", name, price, provider_id="kilo-code", calculation_status="exact", confidence="high",
+        allowance_type="model credits plus loyalty bonus", headline=f"${price} paid credit plus up to 40% mature monthly bonus (${q(mature)} total); annual plans receive 50% (${q(annual)}).",
+        sources_=["kilo-pricing"], value_multiple_low=1.4, value_multiple_high=1.5, included_value_usd=q(mature),
+        formula="monthly value = price × (1 + loyalty bonus); bonus grows 5 percentage points/month to 40%; annual bonus = 50%",
+        quotas={"paidCreditsUsd": price, "matureMonthlyCreditsUsd": q(mature), "annualMonthlyCreditsUsd": q(annual)},
+        models=["Kilo model catalog"], notes=["Bonus credits expire and require paid-credit eligibility."], unit="model-credit USD", plan_units=q(mature),
+    ))
+
+# ---- Cursor pools: exact lower bound from official structure; amounts above $20 use current public plan figures ----
+for name, price, third_party in [("Pro", 20, 20), ("Pro+", 60, 70), ("Ultra", 200, 400)]:
+    plans.append(make_plan(
+        "Cursor", name, price, provider_id="cursor", calculation_status="partial", confidence="medium",
+        allowance_type="two usage pools", headline=f"At least ${third_party} third-party model usage plus a separate, larger Cursor-model pool.",
+        sources_=["cursor-pricing", "tokenplans"],
+        value_multiple=q(Decimal(third_party)/Decimal(price), "0.001"), included_value_usd=third_party,
+        formula="Other Models pool is charged at model API prices; Cursor Models use a separate first-party pool with published model rates but unpublished pool size",
+        quotas={"thirdPartyPoolUsd": third_party, "cursorModelsPool": "opaque"},
+        models=["Cursor Grok 4.6", "Cursor Grok 4.5", "Composer 2.5", "frontier third-party models"],
+        notes=["The displayed multiple is only a lower bound from the third-party pool and excludes first-party Cursor-model usage."],
+        unit="API-rate USD plus opaque first-party units", plan_units=third_party,
+        details={"cursorModelRates": [
+            {"model": "Cursor Grok 4.6", "inputPerMUsd": 2, "cachePerMUsd": 0.5, "outputPerMUsd": 6},
+            {"model": "Composer 2.5", "inputPerMUsd": 0.5, "cachePerMUsd": 0.2, "outputPerMUsd": 2.5},
+        ]},
+    ))
+
+# ---- MiniMax exact repricing formula, hidden included bars ----
+for name, price, secondary_tokens_b in [("Plus", 20, 1.7), ("Max", 50, 5.1), ("Ultra", 120, 12.5)]:
+    plans.append(make_plan(
+        "MiniMax Token Plan", name, price, provider_id="minimax", calculation_status="partial", confidence="medium",
+        allowance_type="PAYG-priced opaque 5h and weekly quota bars",
+        headline=f"Every request is priced at MiniMax PAYG rates, but the numeric included bars are hidden; tracker estimate ~{secondary_tokens_b}B raw tokens/month.",
+        sources_=["minimax-token-plan", "minimax-paygo", "tokenplans"],
+        formula="quota deduction = request PAYG value at the endpoint's current input/cache/output rates; allowance = hidden 5h and weekly bars",
+        quotas={"fiveHour": "opaque", "weekly": "opaque", "secondaryRawTokensMonthlyB": secondary_tokens_b},
+        models=["MiniMax M3", "MiniMax M2.7", "MiniMax multimodal catalog"],
+        notes=["Raw-token estimates depend on token mix and model; they are not a stable dollar value."],
+        unit="hidden provider-rate quota",
+        details={"modelRates": [
+            {"model": "MiniMax M3 ≤512k", "inputPerMUsd": 0.3, "cachePerMUsd": 0.06, "outputPerMUsd": 1.2},
+            {"model": "MiniMax M3 >512k", "inputPerMUsd": 0.6, "cachePerMUsd": 0.12, "outputPerMUsd": 2.4},
+            {"model": "MiniMax M2.7", "inputPerMUsd": 0.3, "cachePerMUsd": 0.06, "outputPerMUsd": 1.2, "cacheWritePerMUsd": 0.375},
+        ]},
+    ))
+
+# ---- Kimi official membership units plus hidden absolute token conversion ----
+for name, price, annual, code_relative, agent_credits, tasks, swarm_uses, subagents in [
+    ("Moderato", 19, 15, 1, 60, 2, 25, 2),
+    ("Allegretto", 39, 31, 5, 150, 2, 50, 4),
+    ("Allegro", 99, 79, 15, 360, 4, 120, 4),
+    ("Vivace", 199, 159, 30, 720, 4, 240, 8),
+]:
+    plans.append(make_plan(
+        "Kimi Code", name, price, provider_id="kimi-code", calculation_status="partial", confidence="high",
+        allowance_type="shared token-metered credits plus opaque Code windows",

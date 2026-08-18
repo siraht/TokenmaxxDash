@@ -1,0 +1,89 @@
+                {"term": "yearly", "effectiveMonthlyUsd": q(yearly_effective_monthly), "valueMultiple": q(yearly_multiple, "0.001")},
+            ],
+        },
+    ))
+
+# Apertis charges one fixed quota multiplier per request, independent of request token length.
+apertis_plans = [
+    ("Lite", 12, 600, {"GPT-5.6 Sol": 16, "GPT-5.6 Terra": 8, "GPT-5.6 Luna": 3.5, "DeepSeek V4 Flash": 0.21, "Qwen3.5 Flash": 0.04}),
+    ("Pro", 25, 900, {"GPT-5.6 Sol": 6, "GPT-5.6 Terra": 3, "GPT-5.6 Luna": 1.5, "DeepSeek V4 Flash": 0.15, "Qwen3.5 Flash": 0.02}),
+    ("Plus", 60, 1500, {"GPT-5.6 Sol": 5.5, "GPT-5.6 Terra": 2.75, "GPT-5.6 Luna": 1.25, "DeepSeek V4 Flash": 0.10, "Qwen3.5 Flash": 0.02}),
+    ("Max", 200, 3000, {"GPT-5.6 Sol": 5, "GPT-5.6 Terra": 2.5, "GPT-5.6 Luna": 1, "DeepSeek V4 Flash": 0.06, "Qwen3.5 Flash": 0.01}),
+]
+for name, price, quota, rates in apertis_plans:
+    uses = {model: math.floor(Decimal(quota) / Decimal(str(rate))) for model, rate in rates.items()}
+    plans.append(make_plan(
+        "Apertis", name, price, provider_id="apertis", calculation_status="exact", confidence="high",
+        allowance_type="fixed model-weighted request quota",
+        headline=f"{quota:,} quota/month; representative capacity ranges from {uses['GPT-5.6 Sol']:,} Sol requests to {uses['Qwen3.5 Flash']:,} Qwen Flash requests.",
+        sources_=["apertis-plans", "apertis-billing"],
+        formula="quota consumed per request = fixed model multiplier; estimated uses = monthly quota / model multiplier",
+        quotas={"monthlyQuota": quota, "cacheHits": "free", "tokenLengthAffectsSubscriptionDeduction": False},
+        models=list(rates),
+        notes=[
+            "A ten-token and ten-thousand-token response consume the same subscription quota for a given model.",
+            "Free-model availability changes over time and is additional to the quantified paid-model request capacities.",
+            "No defensible API-dollar value is assigned because the subscription request multiplier is not a token-price denominator.",
+        ],
+        unit="Apertis request-quota unit", plan_units=quota,
+        details={"modelRequestRates": [{"model": model, "quotaPerRequest": rate, "estimatedMonthlyUses": uses[model]} for model, rate in rates.items()]},
+    ))
+
+# Regolo publishes a raw-token ceiling shared across included models.
+for name, price_eur, daily_m, monthly_m in [
+    ("Core", 39, 20, 600), ("Boost", 89, 50, 1500), ("Pro", 169, 100, 3000), ("Scale", 319, 200, 6000),
+]:
+    per_m = Decimal(str(price_eur)) / Decimal(str(monthly_m))
+    plans.append(make_plan(
+        "Regolo", name, price_eur, provider_id="regolo", currency="EUR", calculation_status="exact", confidence="high",
+        allowance_type="raw token quota",
+        headline=f"{daily_m}M tokens/day and {monthly_m/1000:g}B/month; effective subscription price €{q(per_m, '0.0001')}/M raw tokens if fully used.",
+        sources_=["regolo-pricing"],
+        formula="subscription price per raw million = monthly price / published monthly raw-token allowance",
+        quotas={"dailyRawTokens": daily_m * 1_000_000, "monthlyRawTokens": monthly_m * 1_000_000, "eurPerMillionRawTokens": q(per_m, "0.0001")},
+        models=["Regolo included core-model catalog"],
+        notes=["The published subscription ceiling does not separate cached input, uncached input, or output, so no PAYG-equivalent multiple is asserted."],
+        unit="raw token", plan_units=monthly_m * 1_000_000,
+    ))
+
+# Raw-token subscriptions whose token-category weighting is not published.
+for provider, pid, entries, models, source_ids, eligibility in [
+    ("Routera", "routera", [
+        ("GPT", 90, 500, "GPT models"), ("Claude", 120, 500, "Claude models"),
+        ("GPT + Claude", 200, 1000, "shared GPT and Claude pool"), ("PAYG 100M", 30, 100, "never-expiring prepaid pool"),
+    ], ["GPT models", "Claude models"], ["codingplans-cc"], "interactive-coding"),
+    ("CanopyWave", "canopywave", [
+        ("Token 50M", 15.99, 50, "weighted token pack"), ("Token 200M", 59.99, 200, "weighted token pack"),
+        ("Token 500M", 159.99, 500, "weighted token pack"),
+    ], ["CanopyWave model catalog"], ["codingplans-cc"], "interactive-coding"),
+    ("Novita AI Coding", "novita", [
+        ("Lite", 19.9, 50, "base-equivalent quota"), ("Pro", 49.9, 150, "base-equivalent quota"),
+        ("Max", 199.9, 750, "base-equivalent quota"),
+    ], ["Novita coding-model catalog"], ["novita-coding-plan"], "interactive-coding"),
+]:
+    for name, price, monthly_m, qualifier in entries:
+        per_m = Decimal(str(price)) / Decimal(str(monthly_m))
+        plans.append(make_plan(
+            provider, name, price, provider_id=pid, calculation_status="partial", confidence="medium",
+            allowance_type="monthly token quota", headline=f"{monthly_m:g}M {qualifier}; subscription price ${q(per_m, '0.0001')}/M plan-denominated tokens.",
+            sources_=source_ids, formula="plan-unit price = monthly price / monthly token quota; model weights must be applied separately where published",
+            quotas={"monthlyPlanTokens": int(monthly_m * 1_000_000), "subscriptionUsdPerMillionPlanTokens": q(per_m, "0.0001")},
+            models=models, notes=["Plan-denominated tokens are not assumed to equal raw tokens across every model or token category."],
+            eligibility=eligibility, unit="plan-denominated token", plan_units=monthly_m * 1_000_000,
+        ))
+
+nanogpt_monthly_m = Decimal("60") * WEEKS_PER_MONTH
+plans.append(make_plan(
+    "NanoGPT", "Coding Plan", 12, provider_id="nanogpt", calculation_status="secondary", confidence="medium",
+    allowance_type="weekly input-token quota", headline=f"60M input tokens/week ≈ {q(nanogpt_monthly_m)}M per average month; about ${q(Decimal('12')/nanogpt_monthly_m, '0.0001')}/M included input tokens.",
+    sources_=["codingplans-cc"], formula="average monthly input tokens = 60M × 365.2425/12/7",
+    quotas={"weeklyInputTokens": 60_000_000, "averageMonthlyInputTokens": int(nanogpt_monthly_m * 1_000_000)},
+    models=["NanoGPT coding catalog"], notes=["Output-token and model-weight deductions remain unresolved."],
+    eligibility="personal/noncommercial", unit="input token", plan_units=float(nanogpt_monthly_m * 1_000_000),
+))
+
+# Transparent provider-dollar or replacement-value pools.
+for provider, pid, entries, source_ids, caveat in [
+    ("ZenMux", "zenmux", [("Free", 0, 5), ("Pro", 20, 30), ("Max", 100, 180), ("Ultra", 200, 480)], ["codingplans-cc"], "Provider-rate monthly model value."),
+    ("Trae", "trae", [("Lite", 3, 5), ("Pro", 10, 20), ("Pro+", 30, 90), ("Ultra", 100, 400)], ["codingplans-cc"], "Plan credit value reported by the current pricing catalog."),
+    ("Codebuff", "codebuff", [("Strong 1x", 100, 168), ("Strong 2.5x", 200, 420), ("Strong 7x", 500, 1175)], ["codebuff-pricing"], "PAYG-equivalent replacement value from published credit packs."),

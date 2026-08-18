@@ -1,0 +1,124 @@
+        "status": status,
+        "region": region,
+        "calculationStatus": calculation_status,
+        "confidence": confidence,
+        "allowanceType": allowance_type,
+        "headline": headline,
+        "sourceIds": sources_ or [],
+        "valueMultiple": value_multiple,
+        "valueMultipleLow": value_multiple_low,
+        "valueMultipleHigh": value_multiple_high,
+        "sortValue": sort_value if sort_value is not None else (value_multiple if value_multiple is not None else value_multiple_high),
+        "includedValueUsdMonthly": included_value_usd,
+        "formula": formula,
+        "quotas": quotas or {},
+        "models": models or [],
+        "notes": notes or [],
+        "eligibility": eligibility,
+        "exactness": exactness or calculation_status,
+        "unit": unit,
+        "planUnits": plan_units,
+        "details": details or {},
+        "lastVerified": AS_OF,
+    }
+
+
+plans: list[dict[str, Any]] = []
+
+# ---- Codex: official token-credit rates plus measured hidden subscription pool ----
+codex_rates = [
+    {"model": "GPT-5.6 Sol", "inputPerM": 125, "cachePerM": 12.5, "outputPerM": 750},
+    {"model": "GPT-5.6 Terra", "inputPerM": 50, "cachePerM": 5, "outputPerM": 300},
+    {"model": "GPT-5.6 Luna", "inputPerM": 5, "cachePerM": 0.5, "outputPerM": 30},
+]
+codex_plus_weekly = Decimal("53600") / Decimal("20")
+for tier_name, price, multiple, weekly in [
+    ("Plus", 20, 1, codex_plus_weekly),
+    ("Pro 5x", 100, 5, codex_plus_weekly * 5),
+    ("Pro 20x", 200, 20, Decimal("53600")),
+]:
+    monthly_credits = weekly * WEEKS_PER_MONTH
+    api_value = monthly_credits / Decimal("25")
+    value_multiple = api_value / Decimal(price)
+    pure = []
+    for rate in codex_rates:
+        pure.append({
+            "model": rate["model"],
+            "weeklyPureInputM": q(weekly / Decimal(str(rate["inputPerM"]))),
+            "weeklyPureCachedM": q(weekly / Decimal(str(rate["cachePerM"]))),
+            "weeklyPureOutputM": q(weekly / Decimal(str(rate["outputPerM"]))),
+        })
+    observed = None
+    if tier_name == "Pro 20x":
+        observed = [
+            {"model": "GPT-5.6 Sol", "weeklyRawTokensB": 3.1, "rangeB": [3.0, 3.5]},
+            {"model": "GPT-5.6 Terra", "weeklyRawTokensB": 5.0, "rangeB": [3.7, 6.3]},
+            {"model": "GPT-5.6 Luna", "weeklyRawTokensB": 42.0, "rangeB": [30.0, 54.0]},
+        ]
+    plans.append(make_plan(
+        "OpenAI Codex",
+        tier_name,
+        price,
+        provider_id="openai-codex",
+        calculation_status="derived",
+        confidence="high" if tier_name == "Pro 20x" else "medium",
+        allowance_type="weighted token credits",
+        headline=(
+            f"About {q(weekly, '0.1'):,.0f} credits/week inferred; ${q(api_value):,.0f}/average-month Standard API value."
+        ),
+        sources_=["openai-codex-rate-card", "openai-pro-tiers", "openai-codex-pricing", "codex-quota-measurement", "codex-token-mix-measurement"],
+        value_multiple=q(value_multiple, "0.001"),
+        included_value_usd=q(api_value),
+        formula="credits = (uncached_input×rate_input + cached_input×rate_cache + output×rate_output) / 1,000,000; 25 credits = $1 Standard API value",
+        quotas={"weeklyCredits": q(weekly, "0.1"), "averageMonthlyCredits": q(monthly_credits, "0.1"), "tierVsPlus": multiple},
+        models=[r["model"] for r in codex_rates],
+        notes=[
+            "The weekly pool is measured, not officially published; Plus and Pro 5x are scaled from the official 1x/5x/20x tier relationship.",
+            "Pure-category ceilings are not realistic blended workloads; observed high-cache token ranges are shown separately.",
+            "Fast mode and long-context modifiers can consume the pool faster.",
+        ],
+        unit="Codex credit",
+        plan_units=q(monthly_credits, "0.1"),
+        details={"modelRates": codex_rates, "pureCategoryCeilings": pure, "observedBlendedWeekly": observed},
+    ))
+plans.append(make_plan(
+    "OpenAI Codex", "Go", 8, provider_id="openai-codex", calculation_status="opaque", confidence="low",
+    allowance_type="weighted token credits", headline="Codex is included, but the Go subscription pool is not numerically published.",
+    sources_=["openai-codex-rate-card", "openai-codex-pricing"], models=[r["model"] for r in codex_rates],
+    notes=["Do not infer Go from Plus without a documented multiplier."], unit="Codex credit",
+))
+plans.append(make_plan(
+    "OpenAI Codex", "Free", 0, provider_id="openai-codex", calculation_status="opaque", confidence="low",
+    allowance_type="promotional included limits", headline="Temporary or account-specific included Codex usage; no stable numerical pool.",
+    sources_=["openai-codex-rate-card", "openai-codex-pricing"], models=[r["model"] for r in codex_rates],
+))
+
+# ---- Transparent provider-rate-dollar plans ----
+command_tiers = [
+    ("Go", 1, 10, 3, 6),
+    ("GOAT", 10, 70, 14, 35),
+    ("Pro", 20, 80, 16, 40),
+    ("Max 10x", 100, 150, 45, 90),
+    ("Max 20x", 200, 300, 90, 180),
+]
+command_rates = [
+    {"model": "GPT-5.6 Sol (promo)", "inputPerMUsd": 2.5, "cachePerMUsd": 0.25, "outputPerMUsd": 15.0, "cacheWritePerMUsd": 3.125},
+    {"model": "GPT-5.6 Terra", "inputPerMUsd": 2.0, "cachePerMUsd": 0.2, "outputPerMUsd": 12.0, "cacheWritePerMUsd": 2.5},
+    {"model": "GPT-5.6 Luna", "inputPerMUsd": 0.2, "cachePerMUsd": 0.02, "outputPerMUsd": 1.2, "cacheWritePerMUsd": 0.25},
+    {"model": "MiMo V2.5", "inputPerMUsd": 0.14, "cachePerMUsd": 0.0028, "outputPerMUsd": 0.28},
+    {"model": "MiMo V2.5 Pro", "inputPerMUsd": 0.435, "cachePerMUsd": 0.0036, "outputPerMUsd": 0.87},
+    {"model": "MiniMax M3", "inputPerMUsd": 0.3, "cachePerMUsd": 0.06, "outputPerMUsd": 1.2},
+    {"model": "DeepSeek V4 Flash off-peak", "inputPerMUsd": 0.22, "cachePerMUsd": 0.007, "outputPerMUsd": 0.66},
+]
+for name, price, monthly_value, five_h, weekly_value in command_tiers:
+    plans.append(make_plan(
+        "Command Code", name, price, provider_id="command-code", calculation_status="exact", confidence="high",
+        allowance_type="provider-rate dollar credits",
+        headline=f"${monthly_value} monthly provider-rate credits, capped at ${five_h}/5h and ${weekly_value}/7d.",
+        sources_=["command-code-limits"], value_multiple=q(Decimal(monthly_value) / Decimal(price), "0.001"),
+        included_value_usd=monthly_value,
+        formula="provider-rate value = input×rate + cache-read×rate + cache-write×rate + output×rate; every active 5h/7d/month bucket must remain below its cap",
+        quotas={"fiveHourUsd": five_h, "weeklyUsd": weekly_value, "monthlyUsd": monthly_value},
+        models=[r["model"] for r in command_rates],
+        notes=[
+            "Some models have plan-specific monthly subcaps, so the headline credit pool is an upper bound for that model.",

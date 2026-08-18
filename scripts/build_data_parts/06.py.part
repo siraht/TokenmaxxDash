@@ -1,0 +1,93 @@
+        notes=[
+            "Credits are per token, not per million tokens.",
+            "Large raw-token ceilings reflect very cheap model pricing; the API-equivalent subsidy is near 1x before off-peak discounts.",
+        ],
+        unit="MiMo credit", plan_units=int(credits),
+        details={"modelRates": mimo_models, "pureCategoryCeilings": pure},
+    ))
+
+# ---- Z.AI exact token-credit plans and PAYG-equivalent ranges ----
+zai_models = [
+    {"model": "GLM-5.3", "inputMultiplier": 6.9, "cacheMultiplier": 1.7, "outputMultiplier": 24, "apiPricing": None},
+    {"model": "GLM-5-Turbo", "inputMultiplier": 5.7, "cacheMultiplier": 1.5, "outputMultiplier": 21, "apiPricing": {"input": 1.2, "cache": 0.24, "output": 4.0}},
+    {"model": "GLM-4.7", "inputMultiplier": 4.6, "cacheMultiplier": 1.2, "outputMultiplier": 16, "apiPricing": {"input": 0.6, "cache": 0.11, "output": 2.2}},
+]
+for name, price, five_h, weekly in [("Lite", 18, 2000, 10000), ("Pro", 80, 12000, 60000), ("Max", 168, 28000, 140000)]:
+    pure = []
+    monthly_values = []
+    for model in zai_models:
+        input_m = Decimal(weekly) * Decimal("10000") / Decimal(str(model["inputMultiplier"])) / Decimal("1000000")
+        cache_m = Decimal(weekly) * Decimal("10000") / Decimal(str(model["cacheMultiplier"])) / Decimal("1000000")
+        output_m = Decimal(weekly) * Decimal("10000") / Decimal(str(model["outputMultiplier"])) / Decimal("1000000")
+        row = {"model": model["model"], "weeklyPureInputM": q(input_m), "weeklyPureCachedM": q(cache_m), "weeklyPureOutputM": q(output_m)}
+        if model["apiPricing"]:
+            vals = [
+                input_m * Decimal(str(model["apiPricing"]["input"])),
+                cache_m * Decimal(str(model["apiPricing"]["cache"])),
+                output_m * Decimal(str(model["apiPricing"]["output"])),
+            ]
+            monthly = [v * WEEKS_PER_MONTH for v in vals]
+            row["monthlyApiValueRangeUsd"] = [q(min(monthly)), q(max(monthly))]
+            monthly_values.extend(monthly)
+        pure.append(row)
+    low = min(monthly_values)
+    high = max(monthly_values)
+    plans.append(make_plan(
+        "Z.AI Coding Plan", name, price, provider_id="zai", calculation_status="exact", confidence="high",
+        allowance_type="weighted token credits", headline=f"{weekly:,} credits/week; confirmed-model PAYG value about ${q(low)}–${q(high)}/average month at peak rates.",
+        sources_=["zai-devpack", "zai-api-pricing"],
+        value_multiple_low=q(low/Decimal(price), "0.001"), value_multiple_high=q(high/Decimal(price), "0.001"),
+        included_value_usd=q(high),
+        formula="credits = (input×input_multiplier + cached×cache_multiplier + output×output_multiplier)/10,000 + 1.2×MCP_calls; off-peak uses 50% credits",
+        quotas={"fiveHourCredits": five_h, "weeklyCredits": weekly, "offPeakMultiplier": 0.5},
+        models=[m["model"] for m in zai_models],
+        notes=[
+            "GLM-5.3 token capacity is exact, but its matching PAYG price was not published in the source used, so value ranges use GLM-5-Turbo and GLM-4.7.",
+            "Off-peak capacity doubles; shown value multiple is peak-rate consumption.",
+        ],
+        unit="Z.AI credit", plan_units=q(Decimal(weekly)*WEEKS_PER_MONTH, "0.1"),
+        details={"modelRates": zai_models, "pureCategoryCeilings": pure, "offPeakValueMultipleRange": [q(low*2/Decimal(price), "0.001"), q(high*2/Decimal(price), "0.001")]},
+    ))
+
+# ---- Alibaba regional token plan: exact pools; qwen3.6-plus formula derived from official example ----
+alibaba_rates = {"model": "Qwen3.6 Plus (derived from official example)", "inputCreditsPerM": 200, "cacheCreditsPerM": 20, "outputCreditsPerM": 1200}
+for name, price_cny, weekly in [("Personal Lite", 39, 2500), ("Personal Standard", 139, 10000), ("Personal Pro", 499, 40000)]:
+    pure = {
+        "weeklyPureInputM": q(Decimal(weekly)/Decimal("200")),
+        "weeklyPureCachedM": q(Decimal(weekly)/Decimal("20")),
+        "weeklyPureOutputM": q(Decimal(weekly)/Decimal("1200")),
+    }
+    plans.append(make_plan(
+        "Alibaba Cloud Token Plan", name, price_cny, provider_id="alibaba-token-plan", currency="CNY", region="China (Beijing)",
+        calculation_status="derived", confidence="medium", allowance_type="weighted token credits",
+        headline=f"{weekly:,} credits/week; Qwen3.6 Plus example implies {pure['weeklyPureInputM']}M pure input or {pure['weeklyPureCachedM']}M pure cache reads.",
+        sources_=["alibaba-token-plan", "alibaba-credit-example"],
+        formula="for the official Qwen3.6 Plus example: approximately 200 credits/M uncached input + 20 credits/M cached input + 1,200 credits/M output",
+        quotas={"weeklyCredits": weekly}, models=["Qwen3.6 Plus", "other Model Studio coding-plan models"],
+        notes=[
+            "The full live model-multiplier table is required before generalizing this derived Qwen3.6 Plus formula to every model.",
+            "Alibaba explicitly restricts personal Token Plan keys from automated scripts and application backends.",
+        ],
+        eligibility="interactive-only; application backends prohibited",
+        unit="Alibaba plan credit", plan_units=q(Decimal(weekly)*WEEKS_PER_MONTH, "0.1"),
+        details={"derivedModelRate": alibaba_rates, "pureCategoryCeilings": pure},
+    ))
+for name, price_cny, monthly in [("Team Standard", 150, 25000), ("Team Pro", 550, 100000), ("Team Max", 1398, 250000)]:
+    plans.append(make_plan(
+        "Alibaba Cloud Token Plan", name, price_cny, provider_id="alibaba-token-plan", currency="CNY", region="China (Beijing)",
+        calculation_status="derived", confidence="medium", allowance_type="weighted token credits",
+        headline=f"{monthly:,} credits/month per seat; Qwen3.6 Plus token conversion is available, broader model conversion remains incomplete.",
+        sources_=["alibaba-token-plan", "alibaba-credit-example"],
+        formula="same model-specific credit formula as personal plans",
+        quotas={"monthlyCredits": monthly}, models=["Qwen3.6 Plus", "Model Studio coding models"],
+        notes=["Team usage policy differs from the personal-plan automation restriction; verify current terms for backend workloads."],
+        unit="Alibaba plan credit", plan_units=monthly,
+        details={"derivedModelRate": alibaba_rates},
+    ))
+
+# ---- GitHub Copilot exact AI credits ----
+for name, price, credits in [("Pro", 10, 1500), ("Pro+", 39, 7000), ("Max", 100, 20000)]:
+    value = Decimal(credits) * Decimal("0.01")
+    plans.append(make_plan(
+        "GitHub Copilot", name, price, provider_id="github-copilot", calculation_status="exact", confidence="high",
+        allowance_type="token-priced AI credits", headline=f"{credits:,} AI credits/month = ${q(value)} token-rated value; paid completions remain unlimited.",

@@ -1,0 +1,86 @@
+        unit="category token", plan_units=float(monthly_b * Decimal("1000000000")),
+    ))
+
+# Prompt-window plans with published backend-request estimates.
+for name, price, prompts, backend in [
+    ("Mini", 5, 40, 600), ("Starter", 10, 100, 1500), ("Pro", 20, 300, 4500), ("Max", 50, 1000, 15000),
+]:
+    plans.append(make_plan(
+        "StreamLake KwaiKAT", name, price, provider_id="streamlake-kwaikat", calculation_status="secondary", confidence="medium",
+        allowance_type="rolling prompt quota", headline=f"{prompts:,} prompts/5h, estimated at roughly {backend:,} backend requests for the provider's average prompt.",
+        sources_=["codingplans-cc"], formula="backend request estimate = prompt allowance × provider-observed subrequest expansion",
+        quotas={"fiveHourPrompts": prompts, "estimatedFiveHourBackendRequests": backend}, models=["KwaiKAT coding models"],
+        notes=["Prompt and backend-request counts are workload-dependent and are not token equivalents."], unit="top-level prompt", plan_units=prompts,
+    ))
+
+# Router9 credit pools lack a stable dollar conversion.
+for name, price, credits, req4h, rollover in [
+    ("Free", 0, 50000, 20, 0), ("Pro", 29, 500000, 500, 0.60), ("Max", 59, 1500000, 2000, 0.80),
+]:
+    plans.append(make_plan(
+        "Router9", name, price, provider_id="router9", calculation_status="secondary", confidence="medium",
+        allowance_type="monthly credits plus four-hour request window", headline=f"{credits:,} credits/month and {req4h:,} requests/4h" + (f"; {int(rollover*100)}% rollover up to 2×." if rollover else "."),
+        sources_=["codingplans-cc"], formula="request consumes model-specific Router9 credits; dollar and token conversion remains unresolved",
+        quotas={"monthlyCredits": credits, "fourHourRequests": req4h, "rolloverFraction": rollover, "rolloverCapMultiple": 2 if rollover else 0},
+        models=["Router9 model catalog"], unit="Router9 credit", plan_units=credits,
+    ))
+
+# Cosine uses a published add-on price to value included credits.
+for name, price, credits_m, addon_per_m in [
+    ("Starter", 19, 4, 6.5), ("Team", 199, 47, 5), ("Enterprise", 999, 240, 4.5),
+]:
+    replacement = Decimal(str(credits_m)) * Decimal(str(addon_per_m))
+    plans.append(make_plan(
+        "Cosine", name, price, provider_id="cosine", calculation_status="exact", confidence="high",
+        allowance_type="agent credits", headline=f"{credits_m:g}M credits/month; ${q(replacement)} replacement value at the published ${addon_per_m:g}/M add-on price.",
+        sources_=["cosine-pricing"], value_multiple=q(replacement/Decimal(str(price)), "0.001"), included_value_usd=q(replacement),
+        formula="replacement value = included credits in millions × add-on dollars per million",
+        quotas={"monthlyCredits": int(credits_m * 1_000_000), "addonUsdPerMillionCredits": addon_per_m}, unit="Cosine credit", plan_units=credits_m * 1_000_000,
+    ))
+
+# Native-agent and app-builder task/credit systems.
+for name, price, tasks_day, concurrent in [("Free", 0, 15, 3), ("Google AI Pro", 19.99, 100, 15), ("Google AI Ultra", 99.99, 300, 60)]:
+    plans.append(make_plan(
+        "Google Jules", name, price, provider_id="google-jules", calculation_status="exact", confidence="high",
+        allowance_type="daily agent-task quota", headline=f"{tasks_day} agent tasks/day with {concurrent} concurrent tasks.",
+        sources_=["jules-limits"], formula="monthly task ceiling depends on calendar days; daily quota and concurrency bind independently",
+        quotas={"dailyTasks": tasks_day, "concurrentTasks": concurrent, "thirtyDayTaskCeiling": tasks_day * 30},
+        models=["Jules managed coding agent"], notes=["A Jules task is a managed agent job, not a model request or token unit."], unit="agent task", plan_units=tasks_day * 30,
+    ))
+for name, price, tokens_m, daily_m, rollover in [
+    ("Free", 0, 1, 0.3, False), ("Pro", 25, 10, None, True), ("Teams", 30, 10, None, True),
+]:
+    plans.append(make_plan(
+        "Bolt", name, price, provider_id="bolt", calculation_status="exact", confidence="high",
+        allowance_type="app-builder tokens", headline=f"{tokens_m:g}M app-builder tokens/month" + (f" with {daily_m:g}M/day cap." if daily_m else (" with rollover." if rollover else ".")),
+        sources_=["bolt-pricing"], formula="published app-builder tokens are product work units, not raw LLM tokens",
+        quotas={"monthlyBuilderTokens": int(tokens_m * 1_000_000), "dailyBuilderTokens": int(daily_m * 1_000_000) if daily_m else None, "rollover": rollover},
+        models=["Bolt managed app-building agent"], unit="Bolt app-builder token", plan_units=tokens_m * 1_000_000,
+    ))
+for name, price, credits in [("Pro", 20, 100), ("Max", 200, 1500)]:
+    plans.append(make_plan(
+        "a0.dev", name, price, provider_id="a0-dev", calculation_status="secondary", confidence="medium",
+        allowance_type="app-building credits", headline=f"{credits:,} build credits/month.", sources_=["codingplans-cc"],
+        formula="credit consumption is product action-dependent; no token or top-up conversion published",
+        quotas={"monthlyBuildCredits": credits}, models=["a0 managed app agent"], unit="a0 credit", plan_units=credits,
+    ))
+for name, price, message, integration in [
+    ("Free", 0, 25, 500), ("Starter", 16, 100, 2000), ("Builder", 40, 250, 10000),
+    ("Pro", 80, 500, 20000), ("Elite", 160, 1200, 50000),
+]:
+    plans.append(make_plan(
+        "Base44", name, price, provider_id="base44", calculation_status="secondary", confidence="medium",
+        allowance_type="separate message and integration credits", headline=f"{message:,} message credits plus {integration:,} integration credits/month.",
+        sources_=["codingplans-cc"], formula="message and integration pools are separate and cannot be added as one fungible unit",
+        quotas={"monthlyMessageCredits": message, "monthlyIntegrationCredits": integration}, models=["Base44 managed app agent"],
+        notes=["The two credit types remain separate in every calculation."], unit="segmented product credit",
+    ))
+
+# Lovable and v0 expose recurring pools plus conditional daily grants.
+for name, price, monthly, per_credit in [("Pro", 25, 100, 0.25), ("Business", 50, 100, 0.50)]:
+    base_value = Decimal(monthly) * Decimal(str(per_credit))
+    max_daily_value = Decimal(150) * Decimal(str(per_credit))
+    plans.append(make_plan(
+        "Lovable", name, price, provider_id="lovable", calculation_status="exact", confidence="high",
+        allowance_type="monthly build credits plus daily grants", headline=f"{monthly} purchased build credits plus up to 150 daily-grant credits/month; quantified value ${q(base_value)}–${q(base_value+max_daily_value)}.",
+        sources_=["lovable-pricing"], value_multiple_low=q(base_value/Decimal(str(price)), "0.001"), value_multiple_high=q((base_value+max_daily_value)/Decimal(str(price)), "0.001"),

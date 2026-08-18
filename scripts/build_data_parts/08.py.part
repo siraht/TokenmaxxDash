@@ -1,0 +1,98 @@
+        headline=f"{agent_credits} published agent-credit equivalents, Kimi Code at {code_relative}× Moderato, and {tasks} concurrent agent tasks; the token value of the shared pool remains hidden.",
+        sources_=["kimi-membership", "kimi-code-pricing", "kimi-api-pricing"],
+        formula="membership features share a token-metered credit pool; Kimi Code also applies an independent hidden 5-hour and weekly limit; API counterfactual uses cache/input/output token rates",
+        quotas={
+            "agentCreditEquivalent": agent_credits,
+            "kimiCodeRelativeVsModerato": code_relative,
+            "concurrentAgentTasks": tasks,
+            "agentSwarmUses": swarm_uses,
+            "concurrentSwarmSubagents": subagents,
+            "annualEffectiveMonthlyUsd": annual,
+            "kimiCodeFiveHour": "opaque",
+            "kimiCodeWeekly": "opaque",
+        },
+        models=["Kimi K3", "Kimi K2.7 Code", "Kimi K2.6"],
+        notes=[
+            "Agent-credit counts are approximate task equivalents, not fungible API dollars.",
+            "The 1×/5×/15×/30× Kimi Code labels are official relative allowances, but the Moderato base pool is not numerical.",
+            "All membership features share one token-metered pool, so non-code use can reduce available capacity.",
+        ],
+        unit="hidden shared Kimi credit pool",
+        details={"apiRates": [
+            {"model": "Kimi K3", "cachePerMUsd": 0.3, "inputPerMUsd": 3.0, "outputPerMUsd": 15.0},
+            {"model": "Kimi K2.7 Code", "cachePerMUsd": 0.19, "inputPerMUsd": 0.95, "outputPerMUsd": 4.0},
+            {"model": "Kimi K2.6", "cachePerMUsd": 0.16, "inputPerMUsd": 0.95, "outputPerMUsd": 4.0},
+        ]},
+    ))
+
+# ---- Other transparent / partially transparent catalog entries ----
+for name, price, value in [("Lite", 29, 87), ("Pro", 79, 237), ("Max", 179, 537)]:
+    plans.append(make_plan(
+        "LLM Gateway DevPass", name, price, provider_id="devpass", calculation_status="secondary", confidence="medium",
+        allowance_type="provider-rate inference credits", headline=f"Tracker-reported ${value} provider-rate inference value/month.",
+        sources_=["tokenplans"], value_multiple=3.0, included_value_usd=value,
+        formula="provider-rate model usage debits monthly plan value; frontier-model fair-use may add a weekly subcap",
+        quotas={"monthlyUsd": value}, unit="provider-rate USD", plan_units=value,
+    ))
+for name, price, value in [("Plus", 20, 22), ("Super", 100, 110), ("Ultra", 200, 220)]:
+    plans.append(make_plan(
+        "Nous Portal", name, price, provider_id="nous", calculation_status="secondary", confidence="medium",
+        allowance_type="model credits", headline=f"Tracker-reported ${value} model credit/month.", sources_=["tokenplans"],
+        value_multiple=1.1, included_value_usd=value, formula="monthly provider credits", quotas={"monthlyUsd": value}, unit="provider-credit USD", plan_units=value,
+    ))
+plans.append(make_plan(
+    "Mistral Vibe", "Pro", 14.99, provider_id="mistral-vibe", calculation_status="partial", confidence="medium",
+    allowance_type="API credits plus fair-use agent allowance", headline="$30 explicit monthly API credit plus a separate opaque Vibe allowance.",
+    sources_=["tokenplans"], value_multiple=2.0, included_value_usd=30,
+    formula="lower bound = explicit $30 API credit / $14.99 subscription; fair-use Vibe allowance is additional but unquantified",
+    quotas={"monthlyApiCreditsUsd": 30, "vibeAllowance": "opaque"}, unit="API USD plus fair-use units", plan_units=30,
+))
+
+# ---- Additional current token, credit, request and task plans ----
+
+# StepFun publishes the clearest high-subsidy monthly pool in the current market.
+stepfun_models = ["Step 3.7 Flash", "Step 3.5 Flash", "Step 3.5 Flash 2603", "Step Router V1"]
+for name, price, credits_m, quarterly, yearly in [
+    ("Flash Mini", 6.99, 400, 18.99, 69.99),
+    ("Flash Plus", 9.99, 1600, 26.99, 95.99),
+    ("Flash Pro", 29, 8000, 79, 289),
+    ("Flash Max", 99, 40000, 269, 989),
+]:
+    credits = Decimal(credits_m) * Decimal("1000000")
+    approx_value = credits / Decimal("7000000")
+    monthly_multiple = approx_value / Decimal(str(price))
+    quarterly_effective_monthly = Decimal(str(quarterly)) / Decimal("3")
+    yearly_effective_monthly = Decimal(str(yearly)) / Decimal("12")
+    quarterly_multiple = approx_value / quarterly_effective_monthly
+    yearly_multiple = approx_value / yearly_effective_monthly
+    plans.append(make_plan(
+        "StepFun Step Plan", name, price, provider_id="stepfun", calculation_status="derived", confidence="high",
+        allowance_type="monthly unified model-usage credits",
+        headline=f"{credits_m:,}M credits/month ≈ ${q(approx_value):,.2f} of StepFun model usage; no five-hour or RPM/TPM plan bucket.",
+        sources_=["stepfun-plan"], value_multiple=q(monthly_multiple, "0.001"),
+        included_value_usd=q(approx_value),
+        formula="approximate model-usage value = monthly credits / 7,000,000; requests consume model-specific credits",
+        quotas={
+            "monthlyCredits": int(credits), "monthlyCreditsMillions": credits_m,
+            "quarterlyPriceUsd": quarterly,
+            "quarterlyEffectiveMonthlyUsd": q(quarterly_effective_monthly),
+            "quarterlyValueMultiple": q(quarterly_multiple, "0.001"),
+            "yearlyPriceUsd": yearly,
+            "yearlyEffectiveMonthlyUsd": q(yearly_effective_monthly),
+            "yearlyValueMultiple": q(yearly_multiple, "0.001"),
+            "rollingWindow": None, "rollover": False,
+        },
+        models=stepfun_models,
+        notes=[
+            "The official conversion is approximate ($1 ≈ 7M credits), so the value multiple is a transparent nominal estimate rather than exact invoiced dollars.",
+            "All tiers receive the same model speed; credits clear at month end and booster packs expire separately after 30 days.",
+            "The primary ranking uses the month-to-month price so plans with different commitment periods remain comparable; the quarterly and yearly effective prices and multiples are retained on the plan page.",
+            f"At the published yearly price, the effective nominal multiple is approximately {q(yearly_multiple, '0.001'):g}×.",
+            "This value is StepFun-rate replacement value and is not quality-adjusted against frontier proprietary models.",
+        ],
+        unit="StepFun credit", plan_units=int(credits),
+        details={
+            "approxCreditsPerProviderUsd": 7000000,
+            "billingTermValueMultiples": [
+                {"term": "monthly", "effectiveMonthlyUsd": price, "valueMultiple": q(monthly_multiple, "0.001")},
+                {"term": "quarterly", "effectiveMonthlyUsd": q(quarterly_effective_monthly), "valueMultiple": q(quarterly_multiple, "0.001")},

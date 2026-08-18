@@ -1,0 +1,65 @@
+for name, price, universal, swift in [("Free", 0, 10, 0), ("Lite", 10, 30, 50), ("Pro", 20, 50, 80), ("Max", 50, 100, 150)]:
+    total = universal + swift
+    plans.append(make_plan(
+        "SwiftRouter", name, price, provider_id="swift-router", calculation_status="secondary", confidence="medium",
+        allowance_type="segmented model-credit pools", headline=f"${universal} Universal-model credits plus ${swift} Swift-model credits; pools are not fungible.",
+        sources_=["codingplans-cc"], value_multiple=(q(Decimal(total)/Decimal(str(price)), "0.001") if price else None), included_value_usd=total,
+        formula="headline nominal value = Universal pool + Swift-only pool; each segment can be exhausted independently",
+        quotas={"universalCreditsUsd": universal, "swiftOnlyCreditsUsd": swift}, notes=["The displayed multiple is a sum of restricted pools and may overstate realized value if one segment is stranded."],
+        unit="segmented model-credit USD", plan_units=total,
+    ))
+for name, price, requests in [("Free", 0, 100), ("Lite", 10, 150), ("Premium", 20, 300), ("Max", 50, 600)]:
+    plans.append(make_plan(
+        "Routing.sh", name, price, provider_id="routing-sh", calculation_status="secondary", confidence="medium",
+        allowance_type="rolling request quota", headline=f"{requests} requests per rolling five hours.", sources_=["codingplans-cc"],
+        formula="monthly capacity is workload-timing dependent; no fixed request-to-token conversion",
+        quotas={"fiveHourRequests": requests}, models=["Routing.sh multi-model catalog"], unit="request", plan_units=requests,
+    ))
+
+# Generic catalog helper for plans whose current numerical quota is unavailable or not comparable.
+def add_catalog(provider: str, tiers: list[tuple[str, float | None]], *, provider_id: str | None = None,
+                status: str = "active", region: str = "Global", headline: str = "Current quota is not sufficiently published for token-equivalent normalization.",
+                allowance_type: str = "opaque quota", sources_: list[str] | None = None, models: list[str] | None = None,
+                notes: list[str] | None = None, eligibility: str = "interactive-coding", category: str = "coding-subscription", currency: str = "USD") -> None:
+    for name, price in tiers:
+        plans.append(make_plan(
+            provider, name, price, provider_id=provider_id, status=status, region=region, category=category, currency=currency,
+            calculation_status="opaque", confidence="low", allowance_type=allowance_type, headline=headline,
+            sources_=sources_ or ["tokenplans"], models=models or [], notes=notes or [], eligibility=eligibility,
+        ))
+
+add_catalog("Anthropic Claude Code", [("Pro", 20), ("Max 5x", 100), ("Max 20x", 200)], provider_id="claude-code",
+            headline="Rolling five-hour and weekly limits are shared with Claude; absolute token-credit pool is hidden.",
+            allowance_type="opaque rolling 5h + weekly quota", models=["Claude Opus 5", "Claude Fable 5", "Claude Sonnet family"],
+            notes=["External benchmark rows are available, but API-equivalent realized usage is not a stable subscription ceiling."])
+add_catalog("Cline", [("Cline Pass", 9.99)], provider_id="cline",
+            headline="Advertised 2–5× API-rate usage with hidden five-hour, weekly and monthly buckets.",
+            allowance_type="opaque provider-rate buckets", models=["multi-model catalog"])
+add_catalog("Google AI / Antigravity", [("Plus", 4.99), ("Pro", 19.99), ("Ultra 5x", 99.99), ("Ultra 20x", 199.99)], provider_id="google-ai",
+            headline="Relative access multipliers are public, but Antigravity/Jules absolute quota pools remain product-specific and hidden.",
+            allowance_type="shared/product-specific opaque compute quota", models=["Gemini coding models"])
+add_catalog("xAI Grok Build", [("Basic", 10), ("SuperGrok", 30), ("Pro", 100), ("Heavy", 300)], provider_id="xai-grok",
+            headline="Build shares a weekly compute pool with other Grok surfaces; absolute pool and model weighting are hidden.",
+            allowance_type="shared opaque weekly compute pool", models=["Grok coding models"])
+add_catalog("Ollama Cloud", [("Pro", 20), ("Max", 100)], provider_id="ollama-cloud",
+            headline="Five-hour and weekly fair-use limits vary by model usage level; no absolute normalized pool.",
+            allowance_type="model-dependent fair-use quota", status="paused" if False else "active")
+add_catalog("Factory", [("Pro", 20), ("Plus", 100), ("Max", 200)], provider_id="factory",
+            headline="Relative plan scaling and rolling windows are known, but numerical buckets and model multipliers are hidden.",
+            allowance_type="opaque 5h/7d/30d windows")
+add_catalog("Devin Desktop", [("Free", 0), ("Pro", 20), ("Max", 200)], provider_id="devin-desktop",
+            headline="Daily and weekly quota structure is public; included numerical pool is hidden.", allowance_type="opaque daily + weekly quota")
+add_catalog("Amazon Q Developer", [("Free", 0), ("Pro", 19)], provider_id="amazon-q",
+            headline="Free has a small published request allowance; Pro's general agentic allowance is not numerically published.",
+            allowance_type="request quota plus transformation units")
+add_catalog("BytePlus ModelArk", [("Lite", 10), ("Pro", 50)], provider_id="byteplus-modelark", region="Regional",
+            headline="Relative usage claims are available, but an exact token/credit formula and absolute pool are not yet verified.", allowance_type="opaque coding-plan quota")
+add_catalog("Qwen Global Token Plan", [("Lite", 8), ("Standard", 25), ("Pro", 80)], provider_id="qwen-global", region="Selected global regions",
+            headline="Secondary sources report 2.5k/10k/40k weekly credits; current regional primary-source plan and multiplier tables remain unresolved.",
+            allowance_type="weekly token credits", notes=["Keep separate from Alibaba Cloud's China-region Token Plan."])
+add_catalog("Venice.ai", [("Pro", 18)], provider_id="venice",
+            headline="Unlimited/fair-use text access plus premium credits cannot be reduced to one token pool from current public evidence.", allowance_type="fair-use plus premium credits")
+add_catalog("Ozore", [("Starter", 9), ("Builder", 18), ("Pro", 32), ("Max", 50)], provider_id="ozore",
+            headline="Premium-token and direct-model allowances are published in vendor-specific units whose model weights remain incomplete.", allowance_type="premium tokens plus direct-model daily quota")
+add_catalog("Neural Watt", [("Basic", 20), ("Standard", 50), ("Pro", 100)], provider_id="neural-watt",
+            headline="Allowance is denominated in energy-like kWh units; token conversion requires model-specific throughput and power accounting.", allowance_type="compute-energy credits")

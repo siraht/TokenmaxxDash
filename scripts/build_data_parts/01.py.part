@@ -1,0 +1,195 @@
+from __future__ import annotations
+
+import json
+import math
+from copy import deepcopy
+from datetime import date
+from decimal import Decimal, ROUND_HALF_UP
+from pathlib import Path
+from typing import Any
+
+ROOT = Path(__file__).resolve().parents[1]
+SRC_DATA = ROOT / "src" / "data"
+PUBLIC_DATA = ROOT / "public" / "data"
+SRC_DATA.mkdir(parents=True, exist_ok=True)
+PUBLIC_DATA.mkdir(parents=True, exist_ok=True)
+
+AS_OF = "2026-08-17"
+WEEKS_PER_MONTH = Decimal("365.2425") / Decimal("12") / Decimal("7")
+
+
+def q(value: Decimal | float | int, places: str = "0.01") -> float:
+    return float(Decimal(str(value)).quantize(Decimal(places), rounding=ROUND_HALF_UP))
+
+
+def slug(value: str) -> str:
+    value = value.replace("+", " plus ").replace("×", "x")
+    out = []
+    last_dash = False
+    for char in value.lower():
+        if char.isalnum():
+            out.append(char)
+            last_dash = False
+        elif not last_dash:
+            out.append("-")
+            last_dash = True
+    return "".join(out).strip("-")
+
+
+sources: list[dict[str, Any]] = [
+    {
+        "id": "openai-codex-rate-card",
+        "title": "Codex rate card",
+        "publisher": "OpenAI",
+        "url": "https://help.openai.com/en/articles/20001106-codex-rate-card",
+        "type": "official",
+        "supports": ["Codex token-credit rates", "typical task credits"],
+        "verifiedAt": AS_OF,
+    },
+    {
+        "id": "openai-pro-tiers",
+        "title": "About ChatGPT Pro tiers",
+        "publisher": "OpenAI",
+        "url": "https://help.openai.com/en/articles/9793128-about-chatgpt-pro-tiers",
+        "type": "official",
+        "supports": ["$100 Pro is 5x Plus", "$200 Pro is 20x Plus"],
+        "verifiedAt": AS_OF,
+    },
+    {
+        "id": "openai-codex-pricing",
+        "title": "Codex pricing",
+        "publisher": "OpenAI Developers",
+        "url": "https://developers.openai.com/codex/pricing",
+        "type": "official",
+        "supports": ["Plus and Pro prices", "tier multipliers"],
+        "verifiedAt": AS_OF,
+    },
+    {
+        "id": "codex-quota-measurement",
+        "title": "Controlled Pro 20x weekly-credit measurement",
+        "publisher": "Community measurement",
+        "url": "https://www.reddit.com/r/codex/comments/1v6ubah/comment/ozt9jog",
+        "type": "measurement",
+        "supports": ["52k–56k weekly credits", "53,600 center estimate"],
+        "verifiedAt": AS_OF,
+    },
+    {
+        "id": "codex-token-mix-measurement",
+        "title": "Codex token-category telemetry across 945 calls",
+        "publisher": "Community measurement",
+        "url": "https://www.reddit.com/r/codex/comments/1v3c19s/i_used_118m_codex_tokens_in_one_day_and_consumed/",
+        "type": "measurement",
+        "supports": ["uncached/cache/output mixes", "model-specific raw-token estimates"],
+        "verifiedAt": AS_OF,
+    },
+    {
+        "id": "codex-github-37090",
+        "title": "Codex weekly limit at roughly 3.17B tokens",
+        "publisher": "GitHub issue measurement",
+        "url": "https://github.com/openai/codex/issues/37090",
+        "type": "measurement",
+        "supports": ["Sol-heavy weekly raw-token cross-check"],
+        "verifiedAt": AS_OF,
+    },
+    {
+        "id": "opencode-go",
+        "title": "OpenCode Go pricing and estimated requests",
+        "publisher": "OpenCode",
+        "url": "https://opencode.ai/docs/go/",
+        "type": "official",
+        "supports": ["price", "5h/week/month dollar caps", "model request estimates"],
+        "verifiedAt": AS_OF,
+    },
+    {
+        "id": "command-code-limits",
+        "title": "Command Code pricing limits",
+        "publisher": "Command Code",
+        "url": "https://commandcode.ai/docs/resources/pricing-limits",
+        "type": "official",
+        "supports": ["all plan prices and caps", "model rates", "request assumptions"],
+        "verifiedAt": AS_OF,
+    },
+    {
+        "id": "synthetic-limits",
+        "title": "Synthetic rate limits",
+        "publisher": "Synthetic",
+        "url": "https://synthetic.new/rate-limits",
+        "type": "official",
+        "supports": ["pack price", "weighted requests", "weekly API credits"],
+        "verifiedAt": AS_OF,
+    },
+    {
+        "id": "chutes-pricing",
+        "title": "Chutes pricing",
+        "publisher": "Chutes",
+        "url": "https://chutes.ai/",
+        "type": "official",
+        "supports": ["current model rates"],
+        "verifiedAt": AS_OF,
+    },
+    {
+        "id": "tokenplans",
+        "title": "TokenPlans provider and plan catalog",
+        "publisher": "TokenPlans.dev",
+        "url": "https://tokenplans.dev/providers/",
+        "type": "secondary",
+        "supports": ["market discovery", "plan status cross-checks", "opaque-plan estimates"],
+        "verifiedAt": AS_OF,
+    },
+    {
+        "id": "codingplan-org",
+        "title": "CodingPlan subscription comparison",
+        "publisher": "CodingPlan.org",
+        "url": "https://codingplan.org/en",
+        "type": "secondary",
+        "supports": ["plan discovery", "cross-checks for OpenCode, GLM, MiniMax, Kimi and Qwen"],
+        "verifiedAt": AS_OF,
+    },
+    {
+        "id": "codingplans-cc",
+        "title": "AI Coding Plans catalog",
+        "publisher": "codingplans.cc",
+        "url": "https://codingplans.cc/",
+        "type": "secondary",
+        "supports": ["broad provider discovery", "privacy and plan-status cross-checks"],
+        "verifiedAt": AS_OF,
+    },
+    {
+        "id": "vorplabs-limits",
+        "title": "Coding-agent plans and usage limits",
+        "publisher": "Vorp Labs",
+        "url": "https://vorplabs.com/coding-agents/usage-limits",
+        "type": "secondary",
+        "supports": ["limit-mechanism cross-checks", "official-source discovery"],
+        "verifiedAt": AS_OF,
+    },
+    {
+        "id": "hackup-ai-plans",
+        "title": "AI Coding Plans and Tools",
+        "publisher": "HackUp",
+        "url": "https://hackup.ai/ai-plans/",
+        "type": "secondary",
+        "supports": ["plan discovery", "market-status and product-positioning cross-checks"],
+        "verifiedAt": AS_OF,
+    },
+    {
+        "id": "creditsplan",
+        "title": "Coding-plan brand directory",
+        "publisher": "CreditsPlan",
+        "url": "https://www.creditsplan.com/",
+        "type": "secondary",
+        "supports": ["regional and long-tail plan discovery", "privacy-policy cross-checks"],
+        "verifiedAt": AS_OF,
+    },
+    {
+        "id": "codepick",
+        "title": "AI Coding Plans Guide",
+        "publisher": "CodePick",
+        "url": "https://codepick.dev/en/coding-plan/",
+        "type": "secondary",
+        "supports": ["Chinese plan discovery", "cross-provider plan mechanics"],
+        "verifiedAt": AS_OF,
+    },
+    {
+        "id": "mimo-token-plan",
+        "title": "MiMo Token Plan subscription",

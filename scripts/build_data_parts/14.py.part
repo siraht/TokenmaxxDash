@@ -1,0 +1,106 @@
+
+add_catalog("Tabnine", [("Code Assistant", 39), ("Agentic Platform", 59)], provider_id="tabnine", category="team-coding-subscription",
+            headline="Subscription price is known, but included inference volume is not; model access is described as cost plus a service margin.",
+            allowance_type="opaque enterprise inference allowance", sources_=["codingplans-cc"])
+add_catalog("AI Router", [("Developer", 10), ("Pro", 30), ("Max", 100)], provider_id="ai-router",
+            headline="Multi-model routing subscription discovered; current model-credit pool and deduction table require primary verification.",
+            allowance_type="multi-model credits", sources_=["codingplans-cc"])
+add_catalog("Fireworks Fire Pass", [("Developer", 20), ("Power", 100)], provider_id="fireworks-fire-pass",
+            headline="Flat-rate inference product discovered; current model eligibility, throughput and fair-use envelope remain unresolved.",
+            allowance_type="fair-use inference access", sources_=["codingplans-cc"])
+
+# JetBrains, Replit and Augment transparent dollar denominators.
+for name, price, credits in [("AI Pro", 10, 10), ("AI Ultimate", 30, 35), ("Organization Pro", 20, 20), ("Organization Ultimate", 60, 70)]:
+    plans.append(make_plan(
+        "JetBrains AI", name, price, provider_id="jetbrains-ai", calculation_status="exact", confidence="medium",
+        allowance_type="AI credits", headline=f"{credits} AI Credits/month; JetBrains defines one credit as $1.", sources_=["tokenplans"],
+        value_multiple=q(Decimal(credits)/Decimal(price), "0.001"), included_value_usd=credits,
+        formula="1 AI Credit = $1 of usage", quotas={"monthlyAiCredits": credits}, unit="JetBrains AI Credit", plan_units=credits,
+    ))
+for name, price, credits, concurrency in [("Core", 25, 25, 2), ("Pro", 100, 100, 10)]:
+    plans.append(make_plan(
+        "Replit", name, price, provider_id="replit", calculation_status="exact", confidence="medium",
+        allowance_type="platform credits", headline=f"${credits} platform credits/month and up to {concurrency} parallel agents.", sources_=["tokenplans"],
+        value_multiple=1.0, included_value_usd=credits, formula="platform credits deplete according to Replit service pricing",
+        quotas={"monthlyCreditsUsd": credits, "parallelAgents": concurrency}, unit="Replit platform USD", plan_units=credits,
+    ))
+plans.append(make_plan(
+    "Augment Code", "Business", 100, provider_id="augment-code", category="team-coding-subscription",
+    calculation_status="exact", confidence="medium", allowance_type="usage allowance with service fee",
+    headline="$100 usage allowance; model inference is API list price plus a 40% service fee, so at most $71.43 is raw model-list value.",
+    sources_=["tokenplans"], value_multiple=q(Decimal("71.4286")/Decimal("100"), "0.001"), included_value_usd=71.43,
+    formula="raw model-list value = allowance / 1.4 when all usage is LLM inference",
+    quotas={"monthlyAllowanceUsd": 100, "serviceFee": 0.4}, unit="Augment usage USD", plan_units=100,
+))
+
+# Ensure unique IDs and stable ordering.
+seen: set[str] = set()
+for plan in plans:
+    if plan["id"] in seen:
+        raise ValueError(f"duplicate plan id: {plan['id']}")
+    seen.add(plan["id"])
+
+plans.sort(key=lambda p: (p["provider"].lower(), (p["priceMonthly"] is None), p["priceMonthly"] or 0, p["name"].lower()))
+
+# ---- External benchmark data only; no first-party benchmark results are invented. ----
+benchmarks: list[dict[str, Any]] = []
+
+def add_agent_benchmark(agent: str, model: str, index: float, deep: float | None, terminal: float | None,
+                        qna: float | None, cost: float | None, time_m: float | None, tokens_m: float | None,
+                        source_id: str, cache_hit: float | None = None, turns: float | None = None) -> None:
+    benchmarks.append({
+        "id": slug(f"aa-agent-{agent}-{model}"), "kind": "coding-agent", "benchmark": "Artificial Analysis Coding Agent Index",
+        "version": "v1.3", "agent": agent, "model": model, "score": index,
+        "deepSWE": deep, "terminalBenchV2": terminal, "sweAtlasQnA": qna,
+        "apiCostPerTaskUsd": cost, "timePerTaskMinutes": time_m, "tokensPerTaskM": tokens_m,
+        "cacheHitRate": cache_hit, "turnsPerTask": turns, "sourceId": source_id, "retrievedAt": AS_OF,
+        "costMeaning": "Pay-per-token API cost, not subscription allocation.",
+    })
+
+# Claude Code rows
+for row in [
+    ("Opus 5 (xhigh)",67,60,85,55,8.23,23.6,21.8,97,153),
+    ("Fable 5 (max, fallback)",66,66,83,49,11.70,23.4,14.0,None,None),
+    ("Opus 5 (max)",66,63,85,49,8.95,23.7,23.9,None,None),
+    ("Opus 5 (high)",63,61,80,49,3.80,13.4,9.7,None,None),
+    ("Opus 5 (medium)",62,63,79,44,3.14,12.2,7.9,None,None),
+    ("Opus 4.8 (max)",61,56,79,47,7.70,23.1,17.9,None,None),
+    ("Qwen3.8 Max",57,52,79,39,3.86,32.4,13.2,None,None),
+    ("Kimi K2.6",33,17,65,16,1.19,41.0,11.5,None,None),
+    ("DeepSeek V4 Pro (high)",31,9,66,20,0.27,17.9,9.8,None,None),
+]:
+    add_agent_benchmark("Claude Code", *row[:8], source_id="aa-claude-codex", cache_hit=row[8], turns=row[9])
+
+# Codex rows
+for row in [
+    ("GPT-5.6 Sol (max)",67,69,88,43,7.08,10.2,13.2,90,114.2),
+    ("GPT-5.6 Sol (xhigh)",65,67,86,42,5.24,7.4,9.9,None,None),
+    ("GPT-5.6 Sol (high)",64,65,83,45,4.14,6.3,8.1,None,None),
+    ("GPT-5.6 Terra (max)",62,67,84,36,2.21,8.4,9.5,None,None),
+    ("GPT-5.5 (xhigh)",61,64,84,36,5.07,10.1,12.3,None,None),
+    ("GPT-5.6 Sol (medium)",61,64,78,40,2.99,5.2,5.8,None,None),
+    ("GPT-5.6 Luna (max)",59,63,80,33,0.31,8.0,15.5,None,None),
+    ("GPT-5.6 Terra (xhigh)",57,58,81,32,1.52,6.9,6.5,None,None),
+    ("GPT-5.6 Terra (high)",56,60,76,31,1.27,6.2,5.5,None,None),
+    ("DeepSeek V4 Flash (max)",55,43,85,39,0.07,14.6,20.9,None,None),
+    ("GPT-5.6 Luna (xhigh)",55,57,76,31,0.25,6.6,12.3,None,None),
+    ("GPT-5.6 Terra (low)",37,30,58,23,0.39,2.8,1.5,None,None),
+    ("GPT-5.6 Luna (low)",25,10,50,15,0.04,1.9,1.5,None,None),
+    ("GPT-5.6 Terra (none)",24,13,39,19,0.30,1.8,1.1,None,None),
+    ("GPT-5.6 Luna (none)",20,6,37,17,0.07,2.5,3.6,None,None),
+]:
+    add_agent_benchmark("Codex", *row[:8], source_id="aa-codex-kimi", cache_hit=row[8], turns=row[9])
+
+add_agent_benchmark("Kimi Code CLI", "Kimi K3", 61, 64, 84, 37, 3.18, 23.8, 10.6, "aa-codex-kimi", cache_hit=95, turns=124.6)
+
+for row in [
+    ("GPT-5.5 (medium)",46,37,73,28,2.01,6.6,4.0),
+    ("Opus 4.7 (medium)",45,32,71,34,2.68,13.6,5.7),
+    ("Composer 2.5",38,16,67,31,0.08,9.5,3.6),
+    ("Composer 2.5 Fast",38,16,67,31,0.55,6.8,4.2),
+    ("GPT-5.4 (medium)",37,17,66,28,1.55,8.1,4.0),
+    ("Composer 2",27,0,65,18,0.04,8.6,3.0),
+]:
+    add_agent_benchmark("Cursor", *row, source_id="aa-codex-cursor")
+
+# Terminal-Bench 2.1 top rows, kept separate from the composite index.

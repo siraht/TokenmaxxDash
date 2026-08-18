@@ -1,0 +1,98 @@
+            "The monthly credit multiple does not remove the smaller rolling-window constraints.",
+        ],
+        unit="provider-rate USD",
+        plan_units=monthly_value,
+        details={"modelRates": command_rates},
+    ))
+plans.append(make_plan(
+    "Command Code", "Provider", 15, provider_id="command-code", calculation_status="exact", confidence="high",
+    allowance_type="prepaid provider-rate balance", headline="$15 initial PAYG balance; no subscription subsidy multiple.",
+    sources_=["command-code-limits"], value_multiple=1.0, included_value_usd=15,
+    formula="same provider-rate token formula; balance depletes 1:1", unit="provider-rate USD", plan_units=15,
+))
+
+opencode_requests = [
+    ["Grok 4.5", 120, 300, 600], ["GPT-5.6 Luna", 2050, 5100, 10250], ["GLM-5.3", 220, 540, 1080],
+    ["GLM-5.2/5.1", 880, 2150, 4300], ["Kimi K3", 110, 250, 490], ["Kimi K2.7 Code", 1350, 3380, 6750],
+    ["Kimi K2.6", 1150, 2880, 5750], ["MiMo V2.5", 30100, 75200, 150400], ["MiMo V2.5 Pro", 3250, 8150, 16300],
+    ["MiniMax M3", 3200, 8000, 16000], ["MiniMax M2.7", 3400, 8500, 17000], ["Qwen3.8 Max", 160, 400, 810],
+    ["Qwen3.7 Max", 340, 840, 1690], ["Qwen3.7 Plus", 4300, 10800, 21600], ["Qwen3.6 Plus", 3300, 8200, 16300],
+    ["DeepSeek V4 Pro", 1050, 2600, 5200], ["DeepSeek V4 Flash", 7600, 18900, 37800], ["Hy3", 4300, 10750, 21500],
+]
+plans.append(make_plan(
+    "OpenCode Go", "Go", 10, provider_id="opencode-go", calculation_status="exact", confidence="high",
+    allowance_type="provider-rate dollar credits", headline="$12/5h, $30/week and $60/month across the supported catalog.",
+    sources_=["opencode-go"], value_multiple=6.0, included_value_usd=60,
+    formula="model usage is repriced to provider-rate dollars and debited from 5h, weekly and monthly buckets",
+    quotas={"fiveHourUsd": 12, "weeklyUsd": 30, "monthlyUsd": 60, "firstMonthPriceUsd": 5},
+    models=[row[0] for row in opencode_requests],
+    notes=["Request counts are OpenCode's estimates for its assumed average request shape, not universal request sizes."],
+    unit="provider-rate USD", plan_units=60,
+    details={"requestEstimates": [{"model": r[0], "fiveHour": r[1], "weekly": r[2], "monthly": r[3]} for r in opencode_requests]},
+))
+
+for name, price, value, five_h, per_day in [
+    ("Plus", 10, 50, 4.17, 2000), ("Pro", 20, 100, 8.33, 5000)
+]:
+    plans.append(make_plan(
+        "Chutes", name, price, provider_id="chutes", calculation_status="secondary", confidence="medium",
+        allowance_type="provider-rate dollar credits", headline=f"Tracker-reported ${value}/month value with ${five_h}/4h and {per_day:,} requests/day.",
+        sources_=["chutes-pricing", "tokenplans"], value_multiple=q(Decimal(value)/Decimal(price), "0.001"), included_value_usd=value,
+        formula="usage is repriced at current model token rates; exact plan buckets require primary-source confirmation",
+        quotas={"fourHourUsd": five_h, "dailyRequests": per_day, "monthlyUsd": value},
+        models=["DeepSeek V4 Flash", "Qwen3.8", "Kimi K3", "GLM-5.2"],
+        notes=["The model rates are official; plan-bucket figures are currently secondary-source values."],
+        unit="provider-rate USD", plan_units=value,
+    ))
+
+synthetic_monthly = Decimal("24") * WEEKS_PER_MONTH
+plans.append(make_plan(
+    "Synthetic", "Pack", 30, provider_id="synthetic", calculation_status="exact", confidence="high",
+    allowance_type="weighted requests plus weekly API credits",
+    headline=f"500 weighted requests/5h plus $24 API credits/week (~${q(synthetic_monthly)}/average month).",
+    sources_=["synthetic-limits"], value_multiple=q(synthetic_monthly / Decimal("30"), "0.001"), included_value_usd=q(synthetic_monthly),
+    formula="weighted requests use GLM-5.2 as baseline and scale by model input price; API credits regenerate weekly",
+    quotas={"fiveHourWeightedRequests": 500, "weeklyApiCreditsUsd": 24, "concurrentPerModel": 1, "averageMonthlyApiCreditsUsd": q(synthetic_monthly)},
+    models=["GLM-5.2", "Kimi", "MiniMax", "Qwen and other hosted open models"],
+    notes=["Weighted-request capacity and API-credit capacity are distinct buckets; do not add them as identical units."],
+    unit="weighted request / API USD",
+    details={"requestRecovery": "5% every 15 minutes", "creditRecovery": "2% every 202 minutes"},
+))
+
+# ---- MiMo exact credit pools and exact PAYG mapping ----
+mimo_models = [
+    {"model": "MiMo V2.5", "cacheCreditsPerToken": 2, "inputCreditsPerToken": 100, "outputCreditsPerToken": 200, "cacheUsdPerM": 0.0028, "inputUsdPerM": 0.14, "outputUsdPerM": 0.28},
+    {"model": "MiMo V2.5 Pro", "cacheCreditsPerToken": 2.5, "inputCreditsPerToken": 300, "outputCreditsPerToken": 600, "cacheUsdPerM": 0.0036, "inputUsdPerM": 0.435, "outputUsdPerM": 0.87},
+]
+for name, price, credits_b in [("Lite", 6, 4.1), ("Standard", 16, 11), ("Pro", 50, 38), ("Max", 100, 82)]:
+    credits = Decimal(str(credits_b)) * Decimal("1000000000")
+    category_values = []
+    pure = []
+    for model in mimo_models:
+        input_tokens = credits / Decimal(str(model["inputCreditsPerToken"]))
+        cache_tokens = credits / Decimal(str(model["cacheCreditsPerToken"]))
+        output_tokens = credits / Decimal(str(model["outputCreditsPerToken"]))
+        input_value = input_tokens / Decimal("1000000") * Decimal(str(model["inputUsdPerM"]))
+        cache_value = cache_tokens / Decimal("1000000") * Decimal(str(model["cacheUsdPerM"]))
+        output_value = output_tokens / Decimal("1000000") * Decimal(str(model["outputUsdPerM"]))
+        category_values.extend([input_value, cache_value, output_value])
+        pure.append({
+            "model": model["model"],
+            "pureInputM": q(input_tokens / Decimal("1000000")),
+            "pureCachedM": q(cache_tokens / Decimal("1000000")),
+            "pureOutputM": q(output_tokens / Decimal("1000000")),
+            "apiValueInputUsd": q(input_value),
+            "apiValueCacheUsd": q(cache_value),
+            "apiValueOutputUsd": q(output_value),
+        })
+    low = min(category_values)
+    high = max(category_values)
+    plans.append(make_plan(
+        "Xiaomi MiMo Token Plan", name, price, provider_id="xiaomi-mimo", calculation_status="exact", confidence="high",
+        allowance_type="token credits", headline=f"{credits_b:g}B credits/month; roughly ${q(low)}–${q(high)} of matching PAYG value by token category.",
+        sources_=["mimo-token-plan", "mimo-api-pricing"],
+        value_multiple_low=q(low/Decimal(price), "0.001"), value_multiple_high=q(high/Decimal(price), "0.001"),
+        included_value_usd=q(high),
+        formula="credits = cache_tokens×cache_rate + uncached_input×input_rate + output×output_rate",
+        quotas={"monthlyCredits": int(credits), "monthlyCreditsBillions": credits_b},
+        models=[m["model"] for m in mimo_models],

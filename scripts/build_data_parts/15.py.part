@@ -1,0 +1,119 @@
+for agent, model, score in [
+    ("Codex", "GPT-5.6 Sol (xhigh)", 89.5),
+    ("Claude Code", "Opus 5 (max)", 89.1),
+    ("Cursor", "Grok 4.6 (high)", 88.4),
+]:
+    benchmarks.append({
+        "id": slug(f"terminal-bench-2-1-{agent}-{model}"), "kind": "coding-agent", "benchmark": "Terminal-Bench",
+        "version": "2.1", "agent": agent, "model": model, "score": score, "sourceId": "terminal-bench",
+        "retrievedAt": AS_OF, "costMeaning": None,
+    })
+
+# StepFun external model-intelligence rows from Artificial Analysis.
+for model, score, blended, speed, ttft in [
+    ("Step 3.7 Flash", 31, 0.18, 132.5, 2.62),
+    ("Step 3.5 Flash 2603", 27, 0.06, 222.9, 1.13),
+    ("Step 3.5 Flash", 26, 0.12, 243.0, 9.29),
+]:
+    benchmarks.append({
+        "id": slug(f"aa-stepfun-{model}"), "kind": "model-intelligence", "benchmark": "Artificial Analysis Intelligence Index",
+        "version": "current snapshot", "provider": "StepFun", "model": model, "score": score,
+        "blendedPricePerMUsd": blended, "outputTokensPerSecond": speed, "timeToFirstTokenSeconds": ttft,
+        "sourceId": "aa-stepfun-models", "retrievedAt": AS_OF,
+    })
+
+# Selected external model-intelligence rows. These are not merged into the coding-agent index.
+for model, score, provider, source_id, price_in, price_out in [
+    ("Claude Opus 5 (max)", 63, "Anthropic", "aa-methodology", None, None),
+    ("Kimi K3 (max)", 60, "Moonshot AI", "kimi-api-pricing", 3.0, 15.0),
+    ("GPT-5.5 (high)", 55, "OpenAI", "aa-methodology", None, None),
+    ("DeepSeek V4 Pro (max)", 53, "DeepSeek", "aa-methodology", 1.32, 3.96),
+    ("GLM-5.2 (max)", 53, "Z.AI", "zai-api-pricing", 1.4, 4.4),
+    ("MiMo V2.5 Pro", 43, "Xiaomi", "mimo-api-pricing", 0.435, 0.87),
+    ("MiMo V2.5", 38, "Xiaomi", "mimo-api-pricing", 0.14, 0.28),
+]:
+    benchmarks.append({
+        "id": slug(f"aa-model-{model}"), "kind": "model-intelligence", "benchmark": "Artificial Analysis Intelligence Index",
+        "version": "current snapshot", "provider": provider, "model": model, "score": score,
+        "inputPricePerMUsd": price_in, "outputPricePerMUsd": price_out,
+        "sourceId": source_id, "retrievedAt": AS_OF,
+    })
+
+# ---- Derive dashboard summary and value-ranking labels ----
+for plan in plans:
+    if plan["priceMonthly"] == 0:
+        plan["priceDisplay"] = "Free"
+    elif plan["priceMonthly"] is None:
+        plan["priceDisplay"] = "Custom"
+    else:
+        symbol = "$" if plan["currency"] == "USD" else ("¥" if plan["currency"] == "CNY" else "€" if plan["currency"] == "EUR" else "R$" if plan["currency"] == "BRL" else "")
+        plan["priceDisplay"] = f"{symbol}{plan['priceMonthly']:g}/mo"
+    if plan["valueMultiple"] is not None:
+        plan["valueDisplay"] = f"{plan['valueMultiple']:g}×"
+    elif plan["valueMultipleLow"] is not None and plan["valueMultipleHigh"] is not None:
+        plan["valueDisplay"] = f"{plan['valueMultipleLow']:g}–{plan['valueMultipleHigh']:g}×"
+    else:
+        plan["valueDisplay"] = "Unresolved"
+
+ranked = [p for p in plans if p["sortValue"] is not None and p["priceMonthly"] not in (None, 0)]
+ranked.sort(key=lambda p: p["sortValue"], reverse=True)
+
+summary = {
+    "asOf": AS_OF,
+    "planCount": len(plans),
+    "providerCount": len({p["providerId"] for p in plans}),
+    "exactOrDerivedCount": sum(p["calculationStatus"] in {"exact", "derived"} for p in plans),
+    "partialCount": sum(p["calculationStatus"] in {"partial", "secondary"} for p in plans),
+    "opaqueCount": sum(p["calculationStatus"] == "opaque" for p in plans),
+    "externalBenchmarkRows": len(benchmarks),
+    "topNormalizedValue": {
+        "planId": "stepfun-flash-max",
+        "label": "StepFun Step Plan Flash Max",
+        "multiple": next(p["valueMultiple"] for p in plans if p["id"] == "stepfun-flash-max"),
+        "qualification": "Highest transparent nominal replacement-value multiple on month-to-month billing in the normalized set. It uses StepFun's approximate 7M-credits-per-dollar conversion and is not quality-adjusted; the published annual term raises the effective multiple to about 69.34×.",
+    },
+    "topAnnualCommitmentValue": {
+        "planId": "stepfun-flash-max",
+        "label": "StepFun Step Plan Flash Max (yearly)",
+        "multiple": next(
+            p["quotas"]["yearlyValueMultiple"] for p in plans if p["id"] == "stepfun-flash-max"
+        ),
+        "qualification": "Highest transparent nominal replacement-value multiple among captured annual commitment terms; $989/year is $82.42 effective monthly for the same 40B monthly credits.",
+    },
+    "topMeasuredFrontierSubsidy": {
+        "planId": "openai-codex-pro-20x",
+        "label": "OpenAI Codex Pro 20x",
+        "multiple": next(p["valueMultiple"] for p in plans if p["id"] == "openai-codex-pro-20x"),
+        "qualification": "Largest currently measured Standard-API-equivalent subsidy among frontier-model subscriptions in the evidence set; the hidden weekly pool is inferred from user measurements.",
+    },
+    "topMeasuredSubsidy": {
+        "planId": "stepfun-flash-max",
+        "label": "StepFun Step Plan Flash Max",
+        "multiple": next(p["valueMultiple"] for p in plans if p["id"] == "stepfun-flash-max"),
+        "qualification": "Backward-compatible alias for the current top normalized nominal value; see topMeasuredFrontierSubsidy for Codex.",
+    },
+    "topTransparentPlans": [
+        {"id": p["id"], "label": f"{p['provider']} {p['name']}", "valueDisplay": p["valueDisplay"], "status": p["calculationStatus"]}
+        for p in ranked[:12]
+    ],
+}
+
+methodology = {
+    "asOf": AS_OF,
+    "principles": [
+        "Separate provider-rate value, raw token volume, external benchmark quality, and subscription price; no nominal credit multiple is treated as quality-adjusted value.",
+        "Never assign a numerical allowance to a hidden quota without meter or log evidence.",
+        "Keep pure-category token ceilings separate from realistic blended token usage.",
+        "Treat every rate card, plan quota, promotion and model alias as versioned evidence.",
+        "Use only externally published benchmark results in the current dashboard.",
+    ],
+    "calculationStatuses": {
+        "exact": "Official numerical allowance and formula are sufficient for direct calculation.",
+        "derived": "Official formula plus a measured or officially illustrated hidden variable.",
+        "partial": "Some arithmetic is exact, but at least one binding quota or pool remains hidden.",
+        "secondary": "Current calculation relies materially on a comparison tracker pending primary confirmation.",
+        "opaque": "No defensible numerical normalization yet.",
+    },
+    "formulas": {
+        "providerRatePool": "value_usd = Σ(tokens_category / 1M × rate_category) + tool charges",
+        "weightedCredits": "credits = Σ(tokens_category × credit_rate_category) / rate_denominator + tool credits",

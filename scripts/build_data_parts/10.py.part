@@ -1,0 +1,84 @@
+]:
+    for name, price, value in entries:
+        multiple = None if price == 0 else q(Decimal(str(value)) / Decimal(str(price)), "0.001")
+        plans.append(make_plan(
+            provider, name, price, provider_id=pid, calculation_status="exact" if source_ids != ["codingplans-cc"] else "secondary",
+            confidence="high" if source_ids != ["codingplans-cc"] else "medium", allowance_type="provider-rate model credits",
+            headline=f"${value:g} of published model-credit value per month" + (f" ({multiple:g}× price)." if multiple is not None else "."),
+            sources_=source_ids, value_multiple=multiple, included_value_usd=value,
+            formula="value multiple = included provider-rate or replacement-credit value / recurring price",
+            quotas={"monthlyModelValueUsd": value}, notes=[caveat], unit="model-credit USD", plan_units=value,
+        ))
+
+# Atlas Cloud points with advertised discount versus PAYG.
+for name, price, weekly_points_m in [
+    ("Starter", 10, 16.5), ("Lite", 20, 33), ("Plus", 50, 82.5),
+    ("Max", 100, 165), ("Ultra", 200, 330), ("Enterprise", 500, 825),
+]:
+    plans.append(make_plan(
+        "Atlas Cloud", name, price, provider_id="atlas-cloud", calculation_status="secondary", confidence="medium",
+        allowance_type="weekly weighted points", headline=f"{weekly_points_m:g}M points/week; advertised 35–50% below PAYG implies roughly 1.54–2.00× nominal replacement value.",
+        sources_=["codingplans-cc"], value_multiple_low=1.538, value_multiple_high=2.0, included_value_usd=price * 2,
+        formula="replacement multiple = 1 / (1 - advertised discount); point-to-token conversion is model-specific",
+        quotas={"weeklyPoints": int(weekly_points_m * 1_000_000), "advertisedDiscountRange": [0.35, 0.50]},
+        models=["Atlas Cloud model catalog"], notes=["The multiple is an advertised discount-derived range, not a measured universal token value."],
+        unit="Atlas point", plan_units=weekly_points_m * 1_000_000 * float(WEEKS_PER_MONTH),
+    ))
+
+# Request-window and unlimited-throughput plans.
+for name, price, daily, monthly in [("Fast Bundle", 15, 500, 10000), ("Pro Bundle", 30, 500, 10000)]:
+    plans.append(make_plan(
+        "CanopyWave", name, price, provider_id="canopywave", calculation_status="secondary", confidence="medium",
+        allowance_type="request quota", headline=f"{daily:,} requests/day and {monthly:,} requests/month.",
+        sources_=["codingplans-cc"], formula="binding request capacity = min(daily remaining, monthly remaining)",
+        quotas={"dailyRequests": daily, "monthlyRequests": monthly}, models=["CanopyWave bundled models"],
+        notes=["Request size and model weighting are not normalized to tokens."], unit="request", plan_units=monthly,
+    ))
+for name, price, block, concurrent, models in [
+    ("Core", 14.99, 8, 1, ["DeepSeek V4 Flash", "MiMo V2.5"]),
+    ("Frontier", 57, 8, 1, ["Kimi", "GLM", "MiniMax"]),
+    ("Flagship", 149, 8, 1, ["Kimi K3"]),
+]:
+    plans.append(make_plan(
+        "CheapestInference", name, price, provider_id="cheapest-inference", calculation_status="secondary", confidence="medium",
+        allowance_type="unlimited within reserved daily block",
+        headline=f"Unlimited use inside one {block}-hour subscribed block with {concurrent} concurrent request.",
+        sources_=["codingplans-cc"], formula="capacity is throughput-bound during the reserved block rather than token-capped",
+        quotas={"activeHoursPerDay": block, "concurrentRequests": concurrent, "tokenCeiling": None}, models=models,
+        notes=["No infinite-token value is assigned; realizable capacity depends on model throughput and request length."], unit="reserved inference time",
+    ))
+for provider, pid, entries, currency in [
+    ("Yolo-Auto", "yolo-auto", [("Starter", 6, 1, 128000), ("Builder", 10, 2, 128000), ("Pro", 15, 4, 256000)], "USD"),
+    ("Arli AI", "arli-ai", [("Plus", 20, 1, None), ("Pro", 30, 2, None), ("Max", 160, 6, None)], "USD"),
+    ("Verboo Code", "verboo-code", [("Junior", 75, 2, None), ("Pro", 119, 3, None), ("Max", 319, 6, None), ("Ultra", 899, 12, None)], "BRL"),
+]:
+    for name, price, concurrent, context in entries:
+        plans.append(make_plan(
+            provider, name, price, provider_id=pid, currency=currency, calculation_status="secondary", confidence="medium",
+            allowance_type="unlimited/fair-use throughput", headline=f"Unlimited-token access with {concurrent} concurrent request{'s' if concurrent != 1 else ''}" + (f" and {context//1000}K context." if context else "."),
+            sources_=["codingplans-cc"], formula="no finite token pool; capacity is bounded by concurrency, rate limits, context and fair-use policy",
+            quotas={"concurrentRequests": concurrent, "contextTokens": context, "tokenCeiling": None}, models=[f"{provider} model catalog"],
+            unit="throughput-limited access",
+        ))
+for name, price, hourly_cap in [("Lite", 9, 1), ("Essential", 19, 2), ("Pro", 39, 4), ("Ultra", 99, 10)]:
+    plans.append(make_plan(
+        "Claudin.io", name, price, provider_id="claudin", calculation_status="secondary", confidence="medium",
+        allowance_type="unlimited gateway with anti-runaway cap", headline=f"Unlimited normal use subject to a ${hourly_cap}/hour anti-runaway ceiling.",
+        sources_=["codingplans-cc"], formula="ordinary usage is uncapped; automated runaway protection stops spend-equivalent usage above the hourly ceiling",
+        quotas={"antiRunawayUsdPerHour": hourly_cap, "tokenCeiling": None}, models=["Claudin multi-model catalog"], unit="fair-use access",
+    ))
+
+# Daily input/output plans preserve category-specific quotas.
+for name, price, input_m, output_m, model in [
+    ("Qwen 35B", 29, 864, 17.3, "Qwen 35B"), ("Qwen 27B", 49, 518, 10.4, "Qwen 27B"),
+    ("Gemma 31B", 49, 648, 13, "Gemma 31B"), ("DeepSeek V4 Flash", 129, 777, 15.6, "DeepSeek V4 Flash"),
+]:
+    monthly_b = Decimal(str(input_m + output_m)) * Decimal("30") / Decimal("1000")
+    price_per_b = Decimal(str(price)) / monthly_b
+    plans.append(make_plan(
+        "Entrim / OpenClaw", name, price, provider_id="entrim-openclaw", calculation_status="secondary", confidence="medium",
+        allowance_type="separate daily input and output quotas",
+        headline=f"{input_m:g}M input + {output_m:g}M output/day ≈ {q(monthly_b, '0.001')}B raw tokens/30 days; ${q(price_per_b, '0.001')}/B raw tokens.",
+        sources_=["codingplans-cc"], formula="30-day raw capacity = 30 × (daily input + daily output); cached input treatment unresolved",
+        quotas={"dailyInputTokens": int(input_m * 1_000_000), "dailyOutputTokens": int(output_m * 1_000_000), "thirtyDayRawTokensB": q(monthly_b, "0.001")},
+        models=[model], notes=["Input and output buckets cannot substitute for each other; raw-token price is not PAYG-equivalent value."],

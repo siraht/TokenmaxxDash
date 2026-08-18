@@ -1,0 +1,71 @@
+        included_value_usd=q(base_value+max_daily_value), formula="credit value = credits × plan-specific credit price; daily grants count only when claimed",
+        quotas={"monthlyPurchasedCredits": monthly, "maximumMonthlyDailyGrantCredits": 150, "usdPerCredit": per_credit},
+        models=["Lovable managed app agent"], notes=["The upper bound assumes all available daily grants are claimed; it is not guaranteed realized value."],
+        unit="Lovable build credit", plan_units=monthly + 150,
+    ))
+plans.append(make_plan(
+    "Lovable", "Free", 0, provider_id="lovable", calculation_status="exact", confidence="high", allowance_type="daily build credits",
+    headline="5 daily build credits, capped at 30 per month.", sources_=["lovable-pricing"], formula="daily credits stop once the monthly cap is reached",
+    quotas={"dailyCredits": 5, "monthlyCapCredits": 30}, models=["Lovable managed app agent"], unit="Lovable build credit", plan_units=30,
+))
+for name, price, monthly, daily_login in [("Free", 0, 5, 0), ("Plus", 30, 30, 2), ("Business", 100, 30, 2)]:
+    low = Decimal(monthly)
+    high = low + Decimal(daily_login * 30)
+    plans.append(make_plan(
+        "v0", name, price, provider_id="v0", calculation_status="exact", confidence="high",
+        allowance_type="platform credits plus conditional login grants", headline=f"${monthly} recurring monthly credits" + (f" plus up to ${daily_login}/day login grants (${q(high)} maximum in a 30-day month)." if daily_login else "."),
+        sources_=["v0-pricing"],
+        value_multiple_low=(q(low/Decimal(str(price)), "0.001") if price else None), value_multiple_high=(q(high/Decimal(str(price)), "0.001") if price else None),
+        included_value_usd=q(high), formula="maximum value = monthly credits + daily login grant × days claimed",
+        quotas={"monthlyCreditsUsd": monthly, "dailyLoginGrantUsd": daily_login, "thirtyDayMaximumUsd": q(high)}, models=["v0 managed app agent"],
+        notes=["Daily login credits are conditional and should not be treated as guaranteed unless claimed."], unit="v0 credit USD", plan_units=q(high),
+    ))
+
+# Other exact or partially exact product-credit plans.
+for name, price_eur, credits in [("Builder", 19.99, 1000), ("Pro", 39.99, 2500), ("Max", 199, 10000)]:
+    plans.append(make_plan(
+        "VULK", name, price_eur, provider_id="vulk", currency="EUR", calculation_status="secondary", confidence="medium",
+        allowance_type="app-building credits", headline=f"{credits:,} product credits/month; €{q(Decimal(str(price_eur))/Decimal(credits), '0.0001')} per included credit.",
+        sources_=["codingplans-cc"], formula="subscription price per product credit = monthly price / included credits",
+        quotas={"monthlyCredits": credits, "eurPerCredit": q(Decimal(str(price_eur))/Decimal(credits), "0.0001")}, models=["VULK managed agent"], unit="VULK credit", plan_units=credits,
+    ))
+plans.append(make_plan(
+    "GitLab Duo", "Premium", 29, provider_id="gitlab-duo", category="team-coding-subscription", calculation_status="exact", confidence="high",
+    allowance_type="GitLab Credits", headline="$12 of GitLab Credits included per user/month; 1 GitLab Credit = $1.",
+    sources_=["gitlab-pricing"], value_multiple=q(Decimal("12")/Decimal("29"), "0.001"), included_value_usd=12,
+    formula="explicit inference-credit lower bound = included GitLab Credits / seat price", quotas={"monthlyGitLabCredits": 12},
+    notes=["The subscription also includes the broader Premium product; the displayed multiple values only the explicit AI-credit pool."], unit="GitLab Credit", plan_units=12,
+))
+plans.append(make_plan(
+    "GitLab Duo", "Ultimate", None, provider_id="gitlab-duo", category="team-coding-subscription", calculation_status="partial", confidence="high",
+    allowance_type="GitLab Credits", headline="$24 of GitLab Credits included per user/month; seat price is custom.",
+    sources_=["gitlab-pricing"], included_value_usd=24, formula="value multiple cannot be computed without contract seat price", quotas={"monthlyGitLabCredits": 24}, unit="GitLab Credit", plan_units=24,
+))
+plans.append(make_plan(
+    "Zed", "Pro", 10, provider_id="zed", calculation_status="exact", confidence="high", allowance_type="token credits plus unlimited edit predictions",
+    headline="$5 token-credit pool plus unlimited edit predictions; explicit pool is a 0.5× lower bound.", sources_=["zed-pricing"],
+    value_multiple=0.5, included_value_usd=5, formula="lower bound = explicit token credits / subscription price",
+    quotas={"monthlyTokenCreditsUsd": 5, "editPredictions": "unlimited"}, notes=["Unlimited edit predictions are additional but not converted to API dollars."], unit="token-credit USD", plan_units=5,
+))
+plans.append(make_plan(
+    "Zed", "Business", 30, provider_id="zed", category="team-coding-subscription", calculation_status="partial", confidence="medium",
+    allowance_type="team coding subscription", headline="Team features and edit predictions are public; a separate numerical token pool is not established in the current snapshot.",
+    sources_=["zed-pricing"], quotas={"monthlyTokenCreditsUsd": "unresolved"}, unit="opaque team allowance",
+))
+for name, price, credits in [("Pro", 45, 30000), ("Pro Plus", 95, 80000), ("Pro Max", 195, 180000)]:
+    plans.append(make_plan(
+        "Zencoder", name, price, provider_id="zencoder", calculation_status="secondary", confidence="medium",
+        allowance_type="agent credits", headline=f"{credits:,} agent credits/month; ${q(Decimal(str(price))*Decimal('1000')/Decimal(credits), '0.001')} per 1,000 included credits.",
+        sources_=["codingplans-cc"], formula="subscription price per 1,000 credits = price × 1,000 / included credits",
+        quotas={"monthlyCredits": credits, "usdPerThousandCredits": q(Decimal(str(price))*Decimal("1000")/Decimal(credits), "0.001")}, unit="Zencoder credit", plan_units=credits,
+    ))
+for name, price, included, credits in [("Build", 20, 20, 1500), ("Business", 50, 20, 1500), ("Max", 200, 240, 18000)]:
+    plans.append(make_plan(
+        "Warp", name, price, provider_id="warp", calculation_status="exact", confidence="high",
+        allowance_type="agent credits with published usage value", headline=f"{credits:,} agent credits representing ${included} of included agent usage.",
+        sources_=["warp-pricing"], value_multiple=q(Decimal(str(included))/Decimal(str(price)), "0.001"), included_value_usd=included,
+        formula="value multiple = published included agent-usage value / plan price", quotas={"monthlyAgentCredits": credits, "includedAgentUsageUsd": included},
+        notes=["The denominator is Warp's agent-usage pricing, not raw model API price."], unit="Warp agent credit", plan_units=credits,
+    ))
+
+# Segmented model pools must remain separate even when their nominal values are summed.
