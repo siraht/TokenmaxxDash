@@ -1,5 +1,6 @@
 node_modules/
 .astro/
+dist/
 .DS_Store
 .env
 .env.*
@@ -9,3 +10,6 @@ research/snapshots/
 __pycache__/
 *.py[cod]
 research/benchmark-candidates/*.raw.json
+src/data/
+public/data/
+.materialized-sources/
