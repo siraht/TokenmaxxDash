@@ -7,6 +7,8 @@ export function getStaticPaths() {
 }
 const { plan } = Astro.props;
 const summary = guide.planSummaries.find((row) => row.id === plan.id);
+const modelById = new Map(guide.models.map((model) => [model.id, model]));
+const advertisedModels = plan.models.map((modelId) => modelById.get(modelId)).filter(Boolean).sort((a, b) => (b.intelligence ?? -1) - (a.intelligence ?? -1));
 const routes = guide.rows.filter((row) => row.planId === plan.id).sort((a, b) => (a.agentic.qualityAdjustedUsdPerM ?? Infinity) - (b.agentic.qualityAdjustedUsdPerM ?? Infinity));
 const requests = guide.requestRows.filter((row) => row.planId === plan.id);
 const money = (value) => typeof value === 'number' ? `$${value.toFixed(value < .01 ? 5 : 3)}` : '—';
@@ -23,7 +25,14 @@ const number = (value, digits = 2) => typeof value === 'number' ? value.toLocale
 
   {plan.missingFields?.length > 0 && <section class="section compact"><div class="callout warning"><strong>Still missing from the provider’s public evidence:</strong> {plan.missingFields.join(' · ')}</div></section>}
 
-  {routes.length > 0 && <section class="section"><div class="section-heading"><div><p class="section-kicker">Token-comparable routes</p><h2>Every served model with a defensible rate</h2></div><p>Agentic high-cache values are shown; the downloadable data also contains standardized 7:2:1.</p></div><div class="panel"><div class="table-shell"><table>
+  {advertisedModels.length > 0 && <section class="section"><div class="section-heading"><div><p class="section-kicker">Advertised model evidence</p><h2>The model quality and API economics are shown even when the subscription pool is hidden</h2></div><p>A model’s public API rate does not reveal the subscription allowance. It still tells you what quality is available and exactly which denominator is preventing a subscription $/token calculation.</p></div><div class="panel"><div class="table-shell"><table>
+    <thead><tr><th>Model</th><th>Intelligence</th><th>Coding result</th><th>Standard API $/M</th><th>Agentic API $/M</th><th>$/M/intelligence point</th><th>Other subscription routes</th></tr></thead>
+    <tbody>{advertisedModels.map((model) => (
+      <tr><td><strong>{model.name}</strong><span class="cell-sub">{model.provider}</span></td><td class="numeric">{model.intelligence?.toFixed(1) ?? '—'}</td><td>{model.taskBenchmark ? <><strong>{(model.taskBenchmark.passRate * 100).toFixed(1)}%</strong><span class="cell-sub">{model.taskBenchmark.benchmark} · {model.taskBenchmark.harness}</span></> : '—'}</td><td class="numeric">{money(model.standardApiUsdPerM)}</td><td class="numeric">{money(model.agenticApiUsdPerM)}</td><td class="numeric">{money(model.agenticApiUsdPerMPerIntelligencePoint)}</td><td class="numeric">{model.subscriptionRouteCount}</td></tr>
+    ))}</tbody>
+  </table></div></div></section>}
+
+  {routes.length > 0 && <section class="section"><div class="section-heading"><div><p class="section-kicker">Token-comparable routes</p><h2>Every served model with a defensible subscription denominator</h2></div><p>Agentic high-cache values are shown; the downloadable data also contains standardized 7:2:1.</p></div><div class="panel"><div class="table-shell"><table>
     <thead><tr><th>Model</th><th>Access</th><th>Intelligence</th><th>Coding</th><th>API $/M</th><th>Raw tokens/month</th><th>Subscription $/M</th><th>Quality-adjusted $/M</th><th>$/successful task</th></tr></thead>
     <tbody>{routes.map((row) => (
       <tr><td><strong>{row.model}</strong><span class="cell-sub">{row.modelProvider}</span></td><td>{row.accessMode || 'included'}{row.allowanceFraction !== 1 && <span class="cell-sub">{(row.allowanceFraction * 100).toFixed(0)}% maximum allowance share</span>}</td><td class="numeric">{row.intelligence?.toFixed(1) ?? '—'}</td><td class="numeric">{row.codingScore?.toFixed(1) ?? '—'}</td><td class="numeric">{money(row.agentic.apiRatePerM)}</td><td class="numeric">{number(row.agentic.monthlyTokensM, 1)}M</td><td class="numeric">{money(row.agentic.subscriptionUsdPerM)}</td><td class="numeric"><strong>{money(row.agentic.qualityAdjustedUsdPerM)}</strong></td><td class="numeric">{money(row.agentic.subscriptionUsdPerSuccessfulTask)}</td></tr>
