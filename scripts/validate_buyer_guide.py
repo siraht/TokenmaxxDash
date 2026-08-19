@@ -21,7 +21,6 @@ rows = data["rows"]
 request_rows = data["requestRows"]
 row_ids = {row["id"] for row in rows}
 request_ids = {row["id"] for row in request_rows}
-all_route_ids = row_ids | request_ids
 
 for key, actual in (
     ("planCount", len(plans)),
@@ -55,7 +54,7 @@ for row in rows + request_rows:
             if row.get("intelligence") and not (metrics.get("qualityAdjustedUsdPerM") or 0) > 0:
                 errors.append(f"{row['id']} {mix_id}: missing quality-adjusted token cost")
 
-valid_classes = {"token", "request", "managed", "relative", "provider-hidden"}
+valid_classes = {"token", "request", "managed", "relative", "calibratable", "provider-hidden"}
 for plan in plans.values():
     if plan.get("comparisonClass") not in valid_classes:
         errors.append(f"{plan['id']}: invalid comparison class {plan.get('comparisonClass')}")
@@ -63,8 +62,10 @@ for plan in plans.values():
         errors.append(f"{plan['id']}: missingFields must be a list")
     if not plan.get("researchStatus"):
         errors.append(f"{plan['id']}: researchStatus missing")
-    if plan.get("comparisonClass") == "provider-hidden" and not plan.get("missingFields"):
-        errors.append(f"{plan['id']}: provider-hidden plan lacks exact missing fields")
+    if plan.get("comparisonClass") in {"provider-hidden", "calibratable"} and not plan.get("missingFields"):
+        errors.append(f"{plan['id']}: {plan.get('comparisonClass')} plan lacks exact missing fields")
+    if plan.get("comparisonClass") == "calibratable" and not plan.get("allowance", {}).get("calibrationFormula"):
+        errors.append(f"{plan['id']}: calibratable plan lacks a reproducible formula")
 
 for provider in ("OpenAI Codex", "Claude Code", "Grok Build", "Synthetic"):
     if not any(plan["provider"] == provider for plan in plans.values()):
@@ -75,8 +76,12 @@ if not any(row.get("owned") for row in rows):
     errors.append("no owned baseline route remains in universal rows")
 
 for plan_id in ("grok-build-basic", "grok-build-supergrok", "grok-build-pro", "grok-build-heavy"):
-    if plan_id not in plans:
+    plan = plans.get(plan_id)
+    if not plan:
         errors.append(f"missing Grok tier: {plan_id}")
+    elif plan.get("comparisonClass") != "calibratable":
+        errors.append(f"{plan_id}: Grok billing endpoint must be represented as calibratable")
+
 for provider in ("ZenMux", "Nous Portal", "JetBrains AI", "Zed", "Warp", "Replit", "Cosine", "Codebuff", "Google Jules", "Venice.ai", "Fireworks Fire Pass"):
     if not any(plan["provider"] == provider for plan in plans.values()):
         errors.append(f"verified provider adapter missing: {provider}")
@@ -85,6 +90,7 @@ for plan_id in (
     "copilot-business", "copilot-enterprise", "command-team-pro", "cursor-teams", "kilo-teams-platform",
     "augment-business", "gitlab-duo-premium", "tabnine-code-assistant", "tabnine-agentic-platform",
     "jetbrains-organization-pro", "jetbrains-organization-ultimate", "zed-business",
+    "tabnine-headless-business", "tabnine-headless-enterprise",
 ):
     if plan_id not in plans:
         errors.append(f"monthly team tier missing: {plan_id}")
@@ -97,6 +103,7 @@ for plan_id in ("ozore-basic", "ozore-pro"):
 for stale in ("ozore-starter", "ozore-builder", "ozore-max"):
     if stale in plans:
         errors.append(f"stale Ozore tier survived: {stale}")
+
 for plan_id in ("ai-router-starter", "ai-router-pro", "ai-router-business"):
     if plan_id not in plans:
         errors.append(f"current AI Router tier missing: {plan_id}")
@@ -127,14 +134,26 @@ for plan_id in ("claude-max-5x", "claude-max-20x"):
     if not matches or any(abs(row.get("allowanceFraction", 0) - .5) > 1e-9 for row in matches):
         errors.append(f"{plan_id}: Fable 50% allowance cap missing")
 
-for plan_id in ("clinepass", "factory-pro", "factory-plus", "factory-max",
-                "catalog-google-ai-plus", "catalog-google-ai-pro",
-                "catalog-google-ai-ultra-5x", "catalog-google-ai-ultra-20x",
-                "catalog-byteplus-modelark-lite", "catalog-byteplus-modelark-pro"):
-    if plan_id not in plans:
-        errors.append(f"relative-plan record missing: {plan_id}")
-    elif plans[plan_id].get("comparisonClass") != "relative":
-        errors.append(f"{plan_id}: expected relative comparison class")
+expected_classes = {
+    "clinepass": "token",
+    "factory-pro": "token",
+    "factory-plus": "token",
+    "factory-max": "token",
+    "catalog-google-ai-plus": "token",
+    "catalog-google-ai-pro": "token",
+    "catalog-google-ai-ultra-5x": "token",
+    "catalog-google-ai-ultra-20x": "token",
+    "catalog-byteplus-modelark-lite": "request",
+    "catalog-byteplus-modelark-pro": "request",
+    "ollama-cloud-pro": "token",
+    "ollama-cloud-max": "token",
+}
+for plan_id, expected in expected_classes.items():
+    plan = plans.get(plan_id)
+    if not plan:
+        errors.append(f"inferred-plan record missing: {plan_id}")
+    elif plan.get("comparisonClass") != expected:
+        errors.append(f"{plan_id}: expected {expected}, got {plan.get('comparisonClass')}")
 
 for mix_id in data["mixes"]:
     for collection in ("frontiers", "alternativeFrontiers"):
@@ -166,4 +185,4 @@ if workflow_dir.exists() and any(path.suffix.lower() in {".yml", ".yaml"} for pa
 
 if errors:
     raise SystemExit("\n".join(errors))
-print(f"Validated {len(plans)} plans, {len(models)} models, {len(rows)} token routes, {len(request_rows)} request routes, current Ozore/AI Router/Qwen records, team tiers, relative plans, baseline visibility, Claude Fable access, and zero active Actions workflows.")
+print(f"Validated {len(plans)} plans, {len(models)} models, {len(rows)} token routes, {len(request_rows)} request routes, measured and calibratable inference classes, baseline visibility, Claude Fable access, and zero active Actions workflows.")

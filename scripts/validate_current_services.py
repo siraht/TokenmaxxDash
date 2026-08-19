@@ -70,10 +70,22 @@ if amazon:
 ollama_pro = require("ollama-cloud-pro")
 ollama_max = require("ollama-cloud-max")
 ollama_team = require("ollama-cloud-team")
-if ollama_pro and (ollama_pro["allowance"].get("relativeToFree") != 50 or ollama_pro["allowance"].get("concurrentCloudModels") != 3):
-    errors.append("ollama-cloud-pro: official relative usage or concurrency mismatch")
-if ollama_max and (ollama_max["allowance"].get("relativeToPro") != 5 or ollama_max["allowance"].get("concurrentCloudModels") != 10 or not ollama_max["allowance"].get("newSignupsPaused")):
-    errors.append("ollama-cloud-max: official relative usage, concurrency, or paused status mismatch")
+if ollama_pro:
+    allowance = ollama_pro["allowance"]
+    if allowance.get("kind") != "rawTokensLowerBound" or allowance.get("officialConcurrency") != 3:
+        errors.append("ollama-cloud-pro: measured lower bound or official concurrency missing")
+    if not (allowance.get("monthlyTokensMinimum") or 0) > 600_000_000:
+        errors.append("ollama-cloud-pro: measured monthly lower bound is too small")
+    if not any(row["planId"] == "ollama-cloud-pro" and row["modelId"] == "ollama-mixed-coding-route" for row in rows):
+        errors.append("ollama-cloud-pro: lower-bound mixed route missing")
+if ollama_max:
+    allowance = ollama_max["allowance"]
+    if allowance.get("kind") != "rawTokensLowerBound" or allowance.get("officialConcurrency") != 10:
+        errors.append("ollama-cloud-max: measured lower bound or official concurrency missing")
+    if not allowance.get("newSignupsPaused"):
+        errors.append("ollama-cloud-max: paused signup status missing")
+    if ollama_pro and abs(allowance.get("monthlyTokensMinimum", 0) / ollama_pro["allowance"]["monthlyTokensMinimum"] - 5) > 1e-9:
+        errors.append("ollama-cloud-max: official five-times Pro lower bound missing")
 if ollama_team and ollama_team["allowance"].get("minimumSeats") != 5:
     errors.append("ollama-cloud-team: five-seat minimum missing")
 
@@ -83,4 +95,4 @@ if team and (team["priceUsd"] != 40 or team["allowance"].get("accountMinimumUsd"
 
 if errors:
     raise SystemExit("\n".join(errors))
-print("Validated Neuralwatt energy/request capacity, current MiniMax token and request tiers, Amazon Q inference calls, Ollama relative plans, and Devin Teams semantics.")
+print("Validated Neuralwatt energy/request capacity, current MiniMax token and request tiers, Amazon Q inference calls, measured Ollama lower bounds, and Devin Teams semantics.")
