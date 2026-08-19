@@ -13,30 +13,46 @@ const routes = guide.rows.filter((row) => row.planId === plan.id).sort((a, b) =>
 const requests = guide.requestRows.filter((row) => row.planId === plan.id);
 const money = (value) => typeof value === 'number' ? `$${value.toFixed(value < .01 ? 5 : 3)}` : '—';
 const number = (value, digits = 2) => typeof value === 'number' ? value.toLocaleString('en-US', { maximumFractionDigits: digits }) : '—';
+const tokenCapacity = (metrics) => {
+  const low = metrics.monthlyTokensMLow ?? metrics.monthlyTokensMMinimum;
+  const center = metrics.monthlyTokensMCenter;
+  const high = metrics.monthlyTokensMHigh;
+  if (typeof low === 'number' && typeof high === 'number') {
+    return { primary: `${number(low, 1)}–${number(high, 1)}M`, secondary: center != null ? `${number(center, 1)}M midpoint; ranking uses ${number(low, 1)}M` : 'ranking uses the lower bound' };
+  }
+  if (metrics.capacityIsLowerBound || metrics.capacityEstimateType === 'measured-lower-bound') {
+    return { primary: `≥${number(metrics.monthlyTokensM, 1)}M`, secondary: 'measured lower bound; true capacity may be larger' };
+  }
+  return { primary: `${number(metrics.monthlyTokensM, 1)}M`, secondary: metrics.capacityEstimateType === 'point-or-exact' ? 'point or exact estimate' : null };
+};
 ---
 <BaseLayout title={`${plan.provider} ${plan.plan}`} description={`Subscription economics and evidence for ${plan.provider} ${plan.plan}.`}>
   <section class="detail-hero"><div><p class="eyebrow">{summary.comparisonClass} plan</p><h1>{plan.provider} · {plan.plan}</h1><p class="lede">{plan.note || plan.windows || 'Monthly coding subscription.'}</p></div><div class="price-block"><strong>${plan.priceUsd.toFixed(2)}</strong><span>per month</span>{plan.owned && <span class="badge owned" style="margin-top:8px">Owned baseline</span>}</div></section>
 
-  <section class="panel"><div class="panel-header"><div><h3>Plan denominator</h3><p>{plan.researchStatus} · {plan.confidence}</p></div><a href={plan.source} target="_blank" rel="noreferrer">Source ↗</a></div><div class="panel-body">
+  <section class="panel"><div class="panel-header"><div><h3>Plan denominator</h3><p>{plan.researchStatus} · {plan.confidence}</p></div><a href={plan.source} target="_blank" rel="noreferrer">Primary evidence ↗</a></div><div class="panel-body">
     <dl class="definition-grid">
       <div class="definition"><dt>Comparison class</dt><dd>{plan.comparisonClass}</dd></div><div class="definition"><dt>Allowance kind</dt><dd>{plan.allowance.kind}</dd></div><div class="definition"><dt>Token routes</dt><dd>{routes.length}</dd></div><div class="definition"><dt>Request routes</dt><dd>{requests.length}</dd></div><div class="definition"><dt>Rate windows</dt><dd>{plan.windows || 'No separate window published'}</dd></div><div class="definition"><dt>Policy</dt><dd>{plan.policy}</dd></div>
     </dl><pre class="formula" style="margin-top:14px">{JSON.stringify(plan.allowance, null, 2)}</pre>
   </div></section>
 
+  {plan.comparisonClass === 'calibratable' && <section class="section compact"><div class="callout"><strong>This account can be measured directly.</strong> {plan.allowance.calibrationFormula}<br /><span class="cell-sub">The public sample remains unassigned to a paid tier until a snapshot includes both the subscription tier and the billing response.</span></div></section>}
+
   {plan.missingFields?.length > 0 && <section class="section compact"><div class="callout warning"><strong>Still missing from the provider’s public evidence:</strong> {plan.missingFields.join(' · ')}</div></section>}
 
-  {advertisedModels.length > 0 && <section class="section"><div class="section-heading"><div><p class="section-kicker">Advertised model evidence</p><h2>The model quality and API economics are shown even when the subscription pool is hidden</h2></div><p>A model’s public API rate does not reveal the subscription allowance. It still tells you what quality is available and exactly which denominator is preventing a subscription $/token calculation.</p></div><div class="panel"><div class="table-shell"><table>
+  {plan.evidenceSources?.length > 0 && <section class="section compact"><div class="panel"><div class="panel-header"><div><h3>Evidence chain</h3><p>Official documentation, usage clients, and quantified measurements used for this record.</p></div></div><div class="panel-body source-list">{plan.evidenceSources.map((source) => <a class="source-link" href={source} target="_blank" rel="noreferrer"><strong>{new URL(source).hostname}</strong><span>{source}</span></a>)}</div></div></section>}
+
+  {advertisedModels.length > 0 && <section class="section"><div class="section-heading"><div><p class="section-kicker">Advertised model evidence</p><h2>The model quality and API economics are shown even when part of the subscription pool is hidden</h2></div><p>A model’s public API rate does not reveal the subscription allowance. It still identifies the quality available and the exact denominator preventing a stronger subscription calculation.</p></div><div class="panel"><div class="table-shell"><table>
     <thead><tr><th>Model</th><th>Intelligence</th><th>Coding result</th><th>Standard API $/M</th><th>Agentic API $/M</th><th>$/M/intelligence point</th><th>Other subscription routes</th></tr></thead>
     <tbody>{advertisedModels.map((model) => (
       <tr><td><strong>{model.name}</strong><span class="cell-sub">{model.provider}</span></td><td class="numeric">{model.intelligence?.toFixed(1) ?? '—'}</td><td>{model.taskBenchmark ? <><strong>{(model.taskBenchmark.passRate * 100).toFixed(1)}%</strong><span class="cell-sub">{model.taskBenchmark.benchmark} · {model.taskBenchmark.harness}</span></> : '—'}</td><td class="numeric">{money(model.standardApiUsdPerM)}</td><td class="numeric">{money(model.agenticApiUsdPerM)}</td><td class="numeric">{money(model.agenticApiUsdPerMPerIntelligencePoint)}</td><td class="numeric">{model.subscriptionRouteCount}</td></tr>
     ))}</tbody>
   </table></div></div></section>}
 
-  {routes.length > 0 && <section class="section"><div class="section-heading"><div><p class="section-kicker">Token-comparable routes</p><h2>Every served model with a defensible subscription denominator</h2></div><p>Agentic high-cache values are shown; the downloadable data also contains standardized 7:2:1.</p></div><div class="panel"><div class="table-shell"><table>
-    <thead><tr><th>Model</th><th>Access</th><th>Intelligence</th><th>Coding</th><th>API $/M</th><th>Raw tokens/month</th><th>Subscription $/M</th><th>Quality-adjusted $/M</th><th>$/successful task</th></tr></thead>
-    <tbody>{routes.map((row) => (
-      <tr><td><strong>{row.model}</strong><span class="cell-sub">{row.modelProvider}</span></td><td>{row.accessMode || 'included'}{row.allowanceFraction !== 1 && <span class="cell-sub">{(row.allowanceFraction * 100).toFixed(0)}% maximum allowance share</span>}</td><td class="numeric">{row.intelligence?.toFixed(1) ?? '—'}</td><td class="numeric">{row.codingScore?.toFixed(1) ?? '—'}</td><td class="numeric">{money(row.agentic.apiRatePerM)}</td><td class="numeric">{number(row.agentic.monthlyTokensM, 1)}M</td><td class="numeric">{money(row.agentic.subscriptionUsdPerM)}</td><td class="numeric"><strong>{money(row.agentic.qualityAdjustedUsdPerM)}</strong></td><td class="numeric">{money(row.agentic.subscriptionUsdPerSuccessfulTask)}</td></tr>
-    ))}</tbody>
+  {routes.length > 0 && <section class="section"><div class="section-heading"><div><p class="section-kicker">Token-comparable routes</p><h2>Every served model with a defensible subscription denominator</h2></div><p>Agentic high-cache values are shown. Measured ranges rank by their lower capacity bound, so the displayed subscription cost is conservative.</p></div><div class="panel"><div class="table-shell"><table>
+    <thead><tr><th>Model</th><th>Access</th><th>Intelligence</th><th>Coding</th><th>API $/M</th><th>Raw tokens/month</th><th>Conservative subscription $/M</th><th>Quality-adjusted $/M</th><th>$/successful task</th></tr></thead>
+    <tbody>{routes.map((row) => { const capacity = tokenCapacity(row.agentic); return (
+      <tr><td><strong>{row.model}</strong><span class="cell-sub">{row.modelProvider}</span></td><td>{row.accessMode || 'included'}{row.allowanceFraction !== 1 && <span class="cell-sub">{(row.allowanceFraction * 100).toFixed(0)}% maximum allowance share</span>}</td><td class="numeric">{row.intelligence?.toFixed(1) ?? '—'}</td><td class="numeric">{row.codingScore?.toFixed(1) ?? '—'}</td><td class="numeric">{money(row.agentic.apiRatePerM)}</td><td class="numeric"><strong>{capacity.primary}</strong>{capacity.secondary && <span class="cell-sub">{capacity.secondary}</span>}</td><td class="numeric"><strong>{money(row.agentic.subscriptionUsdPerM)}</strong><span class="cell-sub">{row.agentic.subscriptionCostInterpretation}</span></td><td class="numeric"><strong>{money(row.agentic.qualityAdjustedUsdPerM)}</strong></td><td class="numeric">{money(row.agentic.subscriptionUsdPerSuccessfulTask)}</td></tr>
+    ); })}</tbody>
   </table></div></div></section>}
 
   {requests.length > 0 && <section class="section"><div class="section-heading"><div><p class="section-kicker">Request-denominated routes</p><h2>Native request economics</h2></div><p>These plans publish request weights but not enough information to turn each request into a stable token count.</p></div><div class="panel"><div class="table-shell"><table><thead><tr><th>Model</th><th>Monthly requests</th><th>$/1,000 requests</th><th>Quality-adjusted $/1,000</th></tr></thead><tbody>{requests.map((row) => <tr><td><strong>{row.model}</strong></td><td class="numeric">{number(row.standard.monthlyRequests, 0)}</td><td class="numeric">{money(row.standard.usdPer1000Requests)}</td><td class="numeric">{money(row.standard.qualityAdjustedUsdPer1000Requests)}</td></tr>)}</tbody></table></div></div></section>}
