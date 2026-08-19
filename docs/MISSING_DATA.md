@@ -1,86 +1,88 @@
 # Missing-data audit — 19 August 2026
 
-Tokenmaxx does not use a generic “unresolved” state. Every monthly plan is either numerically comparable in its proper unit or records the exact field that prevents a stronger comparison.
+Tokenmaxx does not use a generic “unresolved” state. Every monthly plan is either numerically comparable in its proper unit, measurable as a range or lower bound, account-calibratable, or documented with the exact field that prevents a stronger comparison.
 
-## Token-comparable
+## Evidence states
 
-A plan enters the main subscription × model table only when all of the following are available:
+| State | Ranking treatment |
+|---|---|
+| Exact token pool | Full plan × model token economics. |
+| Measured token range | Lower capacity bound drives rankings; midpoint and high remain visible. |
+| Measured lower bound | Included in raw-token comparisons as a conservative minimum; displayed $/token is an upper bound. |
+| Native request pool | $/1,000 requests and quality-adjusted request economics; no fabricated tokens/request. |
+| Managed/work-unit pool | Native tasks, credits, energy, processing tokens, or platform units only. |
+| Relative | Tier multiplier is shown, but no raw-token ranking without an absolute base pool. |
+| Account-calibratable | Provider meter and local logs expose a reproducible inversion formula, but no public tier-labeled snapshot identifies a universal plan value. |
+| Provider-hidden | No official or measured path currently identifies the requested denominator. |
 
-1. a monthly subscription price;
-2. an included dollar, token, credit, or measured-capacity denominator;
-3. the model served by the plan;
-4. a model-specific deduction or token-rate formula;
-5. external model quality evidence for quality-adjusted rankings.
+## Previously “unpublished” providers now quantified
 
-The catalog contains direct adapters for Codex, Claude measured ranges, OpenCode Go, Command Code, Synthetic, Chutes, StepFun, Z.AI, MiMo, Alibaba, GitHub Copilot, Cursor’s published third-party pool, Kilo, ZenMux, Nous Portal, JetBrains AI, Zed, Warp, and other plans whose evidence supports that join.
+| Product | Current treatment |
+|---|---|
+| Cursor | Exact $20/$70/$400 third-party Other Models pools. First-party Cursor Models remain a separate unquantified pool. |
+| Claude Code | Current raw-token and API-equivalent ranges from plan-labeled logs and weekly-meter movement. Historical high-capacity accounting is retained separately. |
+| Kimi Code | Allegretto 1.37–1.50B raw tokens/month measured over five months; other tiers scaled by official plan relationships; K3 1M and HighSpeed weights applied. |
+| Factory | 20M/100M/200M Standard-token pools plus current official model multipliers; raw capacity is calculated per model and token mix. |
+| Ollama Cloud | Pro and Max raw-token lower bounds from a measured Pro run plus the official 5× Max relationship. |
+| Google Antigravity | Post-boost mixed-route ranges reconstructed from measured Pro telemetry and Google’s paid-plan increases; individual model weights remain hidden. |
+| BytePlus ModelArk | Lite 1,200/9,000/18,000 and Pro 6,000/45,000/90,000 request ceilings. |
+| ClinePass | $19.98–$49.95 monthly API-equivalent range from the official 2–5× claim, plus an authenticated usage/transaction calibration path. |
+| Grok Build | Account-calibratable from weekly percentage, monthly billing fields, subscription tier display, and local Build token logs. The available $180 public sample remains tier-unassigned. |
+| Devin | Native daily message-equivalent ranges layered on the official work-based daily/weekly structure. |
+| Tabnine | BYOK and hosted-model billing semantics plus exact 5B/50B Headless processing-token plans; underlying LLM bill remains separate. |
 
-## Request-comparable
+The complete formulas and evidence links are in [`QUOTA_INFERENCE.md`](QUOTA_INFERENCE.md).
 
-A plan remains in request units when the provider publishes model-weighted request consumption but does not publish the token distribution of a request. Raw request counts are never presented as tokens.
+## Token-comparable plans
 
-Examples include Synthetic’s weighted-request bucket, Apertis fixed request deductions, and long-tail products with numeric monthly or rolling request limits.
+A plan enters the plan × model token table only when all of the following are available:
+
+1. monthly subscription price;
+2. exact, ranged, or lower-bound included capacity;
+3. exact served model or an explicitly unscored mixed route;
+4. model-specific deduction or a defensible raw-token measurement;
+5. external quality evidence when the route enters intelligence-adjusted rankings.
+
+Mixed-route lower bounds remain useful for absolute capacity and $/raw-token, but they receive no intelligence score unless the model mix is identified.
+
+## Request-comparable plans
+
+A plan remains in request units when it publishes request counts or weights without a stable token distribution. This includes Synthetic weighted requests, Apertis fixed deductions, BytePlus ModelArk, Neuralwatt energy-per-typical-request, Zencoder model-weighted credits, and MiniMax Starter.
+
+Raw request counts are never presented as model tokens.
 
 ## Managed native units
 
-These products expose a real allowance, but the allowance includes orchestration, compute, browser work, deployment, media, or other non-token services:
+These products expose real allowance units that include orchestration, compute, browser work, deployment, media, or other non-token services:
 
-- Google Jules — daily and concurrent managed tasks;
-- Replit — platform credits and parallel agents;
-- Cosine — agent work credits;
-- Kiro — complexity-dependent work credits;
-- Bolt, Lovable, v0, Base44, VULK, and a0.dev — app-builder or product credits;
-- Amazon Q — agentic requests and transformation units;
-- Venice — shared premium credits plus fair-use text;
-- Fireworks Fire Pass, Ollama Cloud, Arli, Claudin, CheapestInference, and similar products — fair-use or reserved-throughput access.
+- Google Jules daily and concurrent managed tasks;
+- Replit platform credits and parallel agents;
+- Cosine and Codebuff work credits;
+- Kiro complexity-dependent work credits;
+- Bolt, Lovable, v0, Base44, VULK, and a0.dev app-builder credits;
+- Amazon Q agentic inference calls and transformation lines;
+- Devin work- and action-based quota ranges;
+- Venice shared premium credits;
+- Tabnine Headless processing tokens with separate LLM billing.
 
-They stay visible with their native economics and cannot enter $/token rankings until a model-token conversion exists.
+They remain visible with native economics and cannot enter model-token rankings until the required conversion exists.
 
-## Relative plans
+## Remaining narrow unknowns
 
-A relative plan publishes a multiplier or weighted plan-token pool without enough information to recover raw model tokens. Examples include Kimi’s relative Code tiers, Codebuff’s tier multipliers, CanopyWave and Routera weighted plan tokens, and products with incomplete model-weight tables.
+| Product | What is still required |
+|---|---|
+| Grok Build | A clean public snapshot pairing `subscription_tier_display`, the billing response, and local token deltas for each paid tier. |
+| Claude Code | Stable current server-side model/category weights and independent clean windows across multiple accounts. |
+| Cursor first-party models | Numerical Cursor Models pool and the distribution of bonus usage. |
+| Kimi Code | Independent longitudinal datasets and stable post-beta Standard/HighSpeed routing behavior. |
+| Factory | Numerical five-hour and seven-day Standard-token sublimits. |
+| Google Antigravity | Fresh post-boost multi-account telemetry and model-specific work/compute weights. |
+| Ollama Cloud | Complete model mix plus server-side input/cache/output totals for clean meter windows. |
+| ClinePass | A public transaction-history + meter-delta calibration window to replace the advertised 2–5× range. |
+| Tabnine reserved hosted inference | Price and size of separately negotiated reserved model quota. |
+| Qwen Global Token Plan | Current primary-source global-plan confirmation and complete live multipliers beyond the official Qwen3.6 Plus worked example. |
 
-Required missing fields are recorded per plan, commonly:
-
-- absolute base-tier allowance;
-- complete per-model deduction weights;
-- whether cached input, fresh input, and output use different weights;
-- the exact checkpoint behind a model-family label.
-
-## Provider-hidden plans
-
-The provider publishes the subscription but withholds the numerical quota or deduction formula. These are the largest remaining gaps:
-
-| Product | Known | Still provider-hidden |
-|---|---|---|
-| Grok Build | tier prices, Grok model API rates, shared weekly-meter behavior | absolute weekly pool, Build weighting, cross-surface consumption formula |
-| Claude Code | prices, plan relationships, model API rates, measured user ranges | official five-hour/weekly pools and hidden model/category meter weights |
-| Cursor first-party models | tier prices and third-party dollar pools | numerical first-party Cursor-model pool and routing weights |
-| MiniMax included Token Plan bars | PAYG request pricing and tier prices | absolute five-hour and weekly included values |
-| Kimi Code | prices, relative tier scaling, concurrency, model pricing | absolute shared token pool and Code-window deductions |
-| Factory | prices and relative 5h/7d/30d structure | numerical buckets and model multipliers |
-| Devin Desktop | tier prices and daily/weekly structure | absolute included daily and weekly quota |
-| Google Antigravity | plan prices and relative access tiers | product-specific absolute compute pool and model weights |
-| Ollama Cloud | prices, concurrency, model-dependent fair use | sustained token/request thresholds and post-threshold behavior |
-| Cline Pass | price and advertised relative value | absolute five-hour, weekly, and monthly pools |
-| BytePlus ModelArk | prices and relative usage claims | absolute quota and token/credit formula |
-| Qwen Global Token Plan | reported tier prices and weekly credits | current primary-source regional plan and complete model multiplier table |
-
-These records are not assigned guessed values. New user measurements can narrow them later, but a single qualitative complaint or an unscoped token count cannot become a plan denominator.
-
-## Long-tail evidence
-
-Many tracker-discovered plans publish useful numeric fields even without a full model join. Tokenmaxx promotes these into their native units:
-
-- NanoGPT weekly input tokens;
-- Entrim/OpenClaw daily input and output quotas;
-- Routera and CanopyWave weighted plan tokens;
-- Routing.sh and StreamLake rolling request windows;
-- Atlas Cloud weighted points;
-- Trae, SwiftRouter, DevPass, and Router9 credit pools;
-- CheapestInference reserved daily access;
-- managed app-builder credits and daily-task plans.
-
-The source remains labeled secondary until a primary provider page confirms the same values.
+These are measurable research targets rather than generic unknown cells.
 
 ## Promotion rule
 
@@ -93,7 +95,9 @@ missingFields[]
 source
 confidence
 allowance
+evidenceSources[]
 model access
+capacity estimate type
 ```
 
 That makes every exclusion inspectable and prevents a weakly documented plan from outranking a plan with reproducible arithmetic.
