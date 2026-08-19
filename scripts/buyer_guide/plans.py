@@ -15,6 +15,8 @@ from .market_updates import apply_market_updates
 from .energy_plans import apply_energy_plans
 from .minimax_plans import apply_minimax_plans
 from .service_updates import apply_service_updates
+from .zencoder_plans import apply_zencoder_plans
+from .work_credit_plans import apply_work_credit_plans
 from .relative_plans import apply_relative_plans
 
 apply_enrichment(PLANS, MODELS, TOP_CATALOG, OPEN_CATALOG, DATA)
@@ -27,4 +29,6 @@ apply_market_updates(PLANS, MODELS)
 apply_energy_plans(PLANS, MODELS)
 apply_minimax_plans(PLANS, MODELS)
 apply_service_updates(PLANS)
+apply_zencoder_plans(PLANS, MODELS)
+apply_work_credit_plans(PLANS)
 apply_relative_plans(PLANS)
