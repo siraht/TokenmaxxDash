@@ -2,8 +2,8 @@
 import BaseLayout from '../layouts/BaseLayout.astro';
 import guide from '../data/buyer-guide.json';
 ---
-<BaseLayout title="Methodology" description="The exact formulas and missing-data rules behind Tokenmaxx monthly coding-subscription comparisons.">
-  <section class="page-intro"><p class="eyebrow">Simple arithmetic, explicit denominators</p><h1>A plan is useful only when its model, allowance, and quality evidence line up.</h1><p class="lede">Tokenmaxx does not turn requests, agent credits, app-builder tokens, or “unlimited” marketing into model tokens without a defensible conversion.</p></section>
+<BaseLayout title="Methodology" description="The formulas, quota-inference methods, conservative range rules, and evidence classes behind Tokenmaxx monthly coding-subscription comparisons.">
+  <section class="page-intro"><p class="eyebrow">Simple arithmetic, aggressive evidence collection</p><h1>A plan is useful only when its model, allowance, and quality evidence line up.</h1><p class="lede">Tokenmaxx searches official rate cards, authenticated usage APIs, local token logs, plan-labeled meter deltas, and quantified user measurements before declaring a quota unavailable.</p></section>
   <article class="prose section compact">
     <h2>Primary token calculation</h2>
     <pre class="formula"><code>{`blended API $/1M = fresh_share × fresh_input_rate
@@ -13,15 +13,45 @@ import guide from '../data/buyer-guide.json';
 included raw tokens (M) = model-eligible monthly pool / blended API $/1M
 subscription $/1M       = monthly subscription price / included raw tokens (M)`}</code></pre>
     <p>The standardized profile uses 20% fresh input, 70% cache reads, and 10% output. The agentic profile uses 2.594% fresh input, 97.108% cache reads, and 0.298% output from public coding-agent telemetry.</p>
+
+    <h2>Quota inversion</h2>
+    <pre class="formula"><code>{`full bucket units ≈ normalized local usage delta / displayed quota-fraction delta
+
+full bucket API value ≈ summed token-category cost / displayed quota-fraction delta`}</code></pre>
+    <p>This is the same method used for the hidden Codex pool. A measurement is accepted only when its plan, time window, reset state, model or route, local usage, and displayed meter movement are identifiable. A shared-product meter such as Grok cannot be assigned to one paid tier from an unlabeled account sample.</p>
+
+    <h2>Ranges and lower bounds</h2>
+    <p>{guide.methodology.rangeRankingRule || 'Measured ranges use their lower capacity bound in rankings.'}</p>
+    <pre class="formula"><code>{`conservative subscription $/1M = subscription price / lower capacity bound
+
+lower-bound plan cost is an upper bound:
+true capacity ≥ observed capacity  ⇒  true $/1M ≤ displayed $/1M`}</code></pre>
+    <p>Midpoint and upper estimates remain in the route data and on plan pages. Historical quota regimes are stored separately and do not silently inflate a current estimate.</p>
+
     <h2>Quality-adjusted token cost</h2><pre class="formula"><code>{`quality-adjusted subscription $/1M
-  = subscription $/1M / (external intelligence score / 100)`}</code></pre><p>This makes a billion tokens of a weak model worth less than a billion tokens of a stronger model while preserving the original price and score. It is a density metric, not a claim that intelligence is linear.</p>
+  = conservative subscription $/1M / (external intelligence score / 100)`}</code></pre><p>This makes a billion tokens of a weak model worth less than a billion tokens of a stronger model while preserving the original price and score. It is a density metric, not a claim that intelligence is linear.</p>
+
     <h2>Task economics</h2><pre class="formula"><code>{`external API $/successful task = published API $/attempt / published pass rate
-monthly task attempts           = included raw tokens / published raw tokens per task
+monthly task attempts           = conservative included raw tokens / published raw tokens per task
 monthly successful tasks        = attempts × published pass rate
 subscription $/successful task  = subscription price / successful tasks`}</code></pre><p>Task results remain tied to the external benchmark and harness. They are plan-capacity counterfactuals, not promises that another agent harness reproduces the same pass rate.</p>
-    <h2>Five comparison classes</h2><ul><li><strong>Token:</strong> a defensible model-specific token denominator.</li><li><strong>Request:</strong> numeric request weights and counts, but no stable tokens per request.</li><li><strong>Managed:</strong> platform credits, agent work units, app-builder tokens, daily tasks, or fair-use throughput.</li><li><strong>Relative:</strong> a multiplier is published, but the absolute base pool is not.</li><li><strong>Provider-hidden:</strong> the subscription exists, but the absolute allowance or deduction formula is withheld.</li></ul>
+
+    <h2>Six comparison classes</h2><ul><li><strong>Token:</strong> an exact, measured-range, or lower-bound model-token denominator.</li><li><strong>Request:</strong> numeric request weights and counts, but no stable tokens per request.</li><li><strong>Managed:</strong> platform credits, agent work units, app-builder tokens, daily tasks, processing tokens, or fair-use throughput.</li><li><strong>Relative:</strong> a multiplier is published, but the absolute base pool or model weights are not.</li><li><strong>Calibratable:</strong> the provider’s own meter and local logs expose a reproducible denominator, but the available public sample is not sufficient to assign one universal plan value.</li><li><strong>Provider-hidden:</strong> neither the provider nor a defensible measurement exposes the allowance or deduction fields required for the requested metric.</li></ul>
+
+    <h2>Provider-specific examples</h2>
+    <ul>
+      <li><strong>Cursor:</strong> exact $20/$70/$400 Other Models pools; separate numerical Cursor Models pool remains unknown.</li>
+      <li><strong>Claude Code:</strong> current raw-token and API-equivalent ranges reconstructed from local logs and weekly-meter movement.</li>
+      <li><strong>Kimi Code:</strong> Allegretto longitudinal measurement scaled by the official plan relationship, with K3 1M and HighSpeed quota weights applied.</li>
+      <li><strong>Factory:</strong> Standard-token pools and model multipliers converted through cache/fresh/output weights.</li>
+      <li><strong>Ollama:</strong> conservative raw-token lower bound from a public Pro run plus the official Max-to-Pro multiplier.</li>
+      <li><strong>Antigravity:</strong> regime-adjusted mixed-route range after Google’s documented paid-plan quota increases.</li>
+      <li><strong>Grok and Cline:</strong> authenticated usage endpoints plus local transaction/token logs provide an account-specific calibration path.</li>
+    </ul>
+    <p><a href="/docs/QUOTA_INFERENCE.md">Read the complete provider derivations in the repository.</a></p>
+
     <h2>Owned-plan behavior</h2><p>{guide.methodology.ownedPlanRule}</p>
-    <h2>Missing data</h2><p>{guide.methodology.missingDataRule}</p><p>A provider-hidden record is a completed research result when the provider itself withholds the required number. It remains in the catalog with the exact missing fields and is excluded only from rankings that require that denominator.</p>
-    <h2>Current model access exceptions</h2><p>Claude Fable 5 is PAYG-only on Claude Pro. Claude Max includes Fable but caps it at 50% of the shared weekly meter; because Anthropic does not publish the Fable meter multiplier, Tokenmaxx applies only the official share cap and keeps the remaining uncertainty visible.</p>
+    <h2>Missing data</h2><p>{guide.methodology.missingDataRule}</p><p>A provider-hidden record is a completed research result only after official, API, local-log, and quantified community evidence paths have been checked. It remains in the catalog with the exact missing fields and is excluded only from rankings that require that denominator.</p>
+    <h2>Current model access exceptions</h2><p>Claude Fable 5 is PAYG-only on Claude Pro. Claude Max includes Fable but caps it at 50% of the shared weekly meter. Kimi K3 1M consumes approximately twice K3 256K quota, while Kimi HighSpeed consumes approximately three times Standard quota. Cursor’s first-party Grok and Composer models use a different pool from its exact Other Models dollar allowance.</p>
   </article>
 </BaseLayout>
