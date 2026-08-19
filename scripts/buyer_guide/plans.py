@@ -18,6 +18,7 @@ from .service_updates import apply_service_updates
 from .zencoder_plans import apply_zencoder_plans
 from .work_credit_plans import apply_work_credit_plans
 from .relative_plans import apply_relative_plans
+from .inferred_subscriptions import apply_inferred_subscriptions
 
 apply_enrichment(PLANS, MODELS, TOP_CATALOG, OPEN_CATALOG, DATA)
 apply_native_units(PLANS, MODELS, DATA)
@@ -32,3 +33,4 @@ apply_service_updates(PLANS)
 apply_zencoder_plans(PLANS, MODELS)
 apply_work_credit_plans(PLANS)
 apply_relative_plans(PLANS)
+apply_inferred_subscriptions(PLANS, MODELS, OPEN_CATALOG, TOP_CATALOG)
