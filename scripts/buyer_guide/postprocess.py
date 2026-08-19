@@ -1,10 +1,12 @@
-"""Add cross-plan audit metadata after the buyer guide has been finalized."""
+"""Add conservative rankings and cross-plan audit metadata after finalization."""
 from __future__ import annotations
 
 import json
 from collections import Counter
 from pathlib import Path
 from typing import Any
+
+from .conservative_metrics import apply_conservative_metrics
 
 ROOT = Path(__file__).resolve().parents[2]
 DATA = ROOT / "src/data"
@@ -14,6 +16,12 @@ PUBLIC = ROOT / "public/data"
 def main() -> None:
     path = DATA / "buyer-guide.json"
     data: dict[str, Any] = json.loads(path.read_text())
+
+    # Finalize initially calculates point estimates. This pass converts every
+    # range and lower-bound route to conservative default economics and rebuilds
+    # frontiers, shortlists, and plan summaries from those values.
+    apply_conservative_metrics(data)
+
     routes = data["rows"] + data["requestRows"]
     route_counts = Counter(row["modelId"] for row in routes)
     model_by_id = {model["id"]: model for model in data["models"]}
@@ -60,7 +68,16 @@ def main() -> None:
         "plansWithTokenComparison": sum(summary["tokenComparisonAvailable"] for summary in data["planSummaries"]),
         "plansWithRequestComparison": sum(summary["requestComparisonAvailable"] for summary in data["planSummaries"]),
         "plansWithAdvertisedModelEvidence": sum(bool(summary["advertisedModelIds"]) for summary in data["planSummaries"]),
+        "calibratablePlans": sum(plan.get("comparisonClass") == "calibratable" for plan in data["plans"]),
+        "measuredRangePlans": sum("range" in str(plan.get("researchStatus", "")) for plan in data["plans"]),
+        "lowerBoundPlans": sum(plan.get("allowance", {}).get("kind") == "rawTokensLowerBound" for plan in data["plans"]),
     }
+
+    data["methodology"]["missingDataRule"] = (
+        "Every plan records its exact missing denominator. Exact, measured-range, lower-bound, native-request, "
+        "managed-work, relative, calibratable, and provider-hidden records remain distinct; only routes with a "
+        "defensible token denominator enter token rankings."
+    )
 
     data["planSummaries"].sort(key=lambda row: (row["provider"].lower(), row["priceUsd"], row["plan"].lower()))
     text = json.dumps(data, indent=2, ensure_ascii=False, allow_nan=False) + "\n"
