@@ -1,53 +1,26 @@
 ---
 import BaseLayout from '../../layouts/BaseLayout.astro';
-import plans from '../../data/plans.json';
-import summary from '../../data/summary.json';
-import { statusLabel } from '../../lib/format';
-const providers = [...new Set(plans.map((plan) => plan.provider))].sort();
-const ordered = [...plans].sort((a, b) => (b.sortValue ?? -1) - (a.sortValue ?? -1));
+import guide from '../../data/buyer-guide.json';
+const providers = [...new Set(guide.planSummaries.map((plan) => plan.provider))].sort();
+const money = (value) => typeof value === 'number' ? `$${value.toFixed(value < .01 ? 5 : 3)}` : '—';
 ---
-<BaseLayout title="Plans" description={`Search and compare ${summary.planCount} coding subscription tiers with evidence status, prices, quotas, and normalized value calculations.`}>
-  <section class="page-intro">
-    <p class="eyebrow">{summary.planCount} tiers · {summary.providerCount} providers</p>
-    <h1>Every plan, including the ones that cannot be ranked yet.</h1>
-    <p class="lede">Exact plans expose a full allowance and deduction formula. Derived plans combine official rates with measured hidden capacity. Measured ranges and provider-hidden plans remain visible without receiving guessed precision.</p>
-  </section>
-
+<BaseLayout title="All monthly plans" description="Every researched monthly AI coding subscription, including token pools, request plans, managed agents, relative tiers, and provider-hidden quotas.">
+  <section class="page-intro"><p class="eyebrow">Complete monthly catalog</p><h1>Every plan stays visible, even when the provider hides the number that would make it comparable.</h1><p class="lede">Token-comparable plans receive $/token and quality-adjusted metrics. Request and managed products keep their native units. Provider-hidden plans state the exact missing allowance, model multiplier, or task conversion.</p></section>
   <section class="section compact">
-    <div class="toolbar" aria-label="Plan filters">
-      <div class="control"><label for="plan-search">Search</label><input id="plan-search" data-filter-search type="search" placeholder="Provider, tier, model or quota…" /></div>
-      <div class="control"><label for="plan-status">Evidence</label><select id="plan-status" data-filter-status><option value="all">All evidence</option><option value="exact">Official exact</option><option value="derived">Evidence-derived</option><option value="measured-range">Measured range</option><option value="partial">Partially normalized</option><option value="provider-hidden">Provider-hidden</option><option value="secondary">Secondary-source</option><option value="unverified-candidate">Unverified candidate</option><option value="legacy">Legacy</option></select></div>
-      <div class="control"><label for="plan-provider">Provider</label><select id="plan-provider" data-filter-provider><option value="all">All providers</option>{providers.map((provider) => <option value={provider}>{provider}</option>)}</select></div>
-      <div class="control"><label for="plan-sort">Sort</label><select id="plan-sort" data-sort-plans><option value="value-desc">Quantified value</option><option value="price-asc">Price: low to high</option><option value="price-desc">Price: high to low</option><option value="provider">Provider</option></select></div>
+    <div class="toolbar">
+      <div class="control"><label for="plan-search">Search</label><input id="plan-search" data-plan-search type="search" placeholder="Provider or plan…" /></div>
+      <div class="control"><label for="plan-provider">Provider</label><select id="plan-provider" data-plan-provider><option value="all">All providers</option>{providers.map((provider) => <option value={provider}>{provider}</option>)}</select></div>
+      <div class="control"><label for="plan-evidence">Evidence</label><select id="plan-evidence" data-plan-evidence><option value="all">All evidence</option><option value="primary">Official + measured</option><option value="official">Official only</option><option value="secondary">Secondary / hidden</option></select></div>
+      <div class="control"><label for="plan-quantified">Comparison</label><select id="plan-quantified" data-plan-quantified><option value="all">All plans</option><option value="yes">Token or request comparable</option><option value="no">Managed, relative, or hidden</option></select></div>
+      <div class="control"><label for="plan-sort">Sort</label><select id="plan-sort" data-plan-sort><option value="provider">Provider</option><option value="price">Price</option><option value="quality-cost">Best quality-adjusted token cost</option></select></div>
     </div>
-    <p class="results-count" data-results-count>{plans.length} plan tiers</p>
-
-    <div class="panel">
-      <div class="table-shell">
-        <table data-plan-table>
-          <thead><tr><th>Provider / plan</th><th>Price</th><th>Value multiple</th><th>Evidence</th><th>Allowance</th><th>Region</th></tr></thead>
-          <tbody>
-            {ordered.map((plan) => (
-              <tr
-                data-plan-row
-                data-search={`${plan.provider} ${plan.name} ${plan.models.join(' ')} ${plan.headline}`.toLowerCase()}
-                data-status={plan.calculationStatus}
-                data-provider={plan.provider}
-                data-value={plan.sortValue ?? -1}
-                data-price={plan.priceMonthly ?? 999999}
-              >
-                <td><a href={`/plans/${plan.id}`}><strong>{plan.provider}</strong><span class="cell-sub">{plan.name}</span></a></td>
-                <td class="numeric">{plan.priceDisplay}</td>
-                <td class="numeric"><strong>{plan.valueDisplay}</strong><span class="cell-sub">{plan.includedValueUsdMonthly != null ? `$${plan.includedValueUsdMonthly.toLocaleString()} quantified value` : 'No defensible denominator'}</span></td>
-                <td><span class={`badge ${plan.calculationStatus}`}>{statusLabel(plan.calculationStatus)}</span><span class="cell-sub">{plan.confidence} confidence</span></td>
-                <td>{plan.headline}</td>
-                <td>{plan.region}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-      <div class="empty-state" data-empty-state>No plan matches those filters.</div>
-    </div>
+    <div class="results-line"><span data-plan-count>{guide.planSummaries.length} plans</span><span>{guide.summary.unquantifiedPlanCount} currently lack a defensible token or request denominator.</span></div>
   </section>
+  <section class="section compact"><div class="plan-grid" data-plan-grid>{guide.planSummaries.map((plan) => (
+    <a class="plan-card" href={`/plans/${plan.id}`} data-plan-card data-search={`${plan.provider} ${plan.plan} ${plan.comparisonClass} ${plan.missingFields.join(' ')}`.toLowerCase()} data-provider={plan.provider} data-confidence={plan.confidence} data-quantified={plan.tokenRouteCount || plan.requestRouteCount ? 'yes' : 'no'} data-price={plan.priceUsd} data-quality-cost={plan.bestAgenticQualityCost ?? 999999}>
+      <div class="topline"><div><strong>{plan.provider}</strong><span class="cell-sub">{plan.plan}</span></div><span class="price">${plan.priceUsd.toFixed(2)}</span></div>
+      <p>{plan.comparisonClass} · {plan.researchStatus} {plan.owned ? '· owned baseline' : ''}</p>
+      <div class="best"><strong>{plan.bestAgenticModel || plan.allowanceKind}</strong><span class="cell-sub">{plan.bestAgenticQualityCost != null ? `${money(plan.bestAgenticQualityCost)} quality-adjusted $/M` : plan.missingFields.slice(0, 3).join(' · ')}</span></div>
+    </a>
+  ))}</div><div class="empty-state" data-plan-empty>No plan matches those filters.</div></section>
 </BaseLayout>

@@ -1,86 +1,15 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
-import models from '../data/models.json';
-import plans from '../data/plans.json';
-import leaders from '../data/leaders.json';
-
-const planById = new Map(plans.map((row) => [row.id, row]));
-const priceFront = new Set(leaders.modelPriceIntelligencePareto || []);
-const speedFront = new Set(leaders.modelSpeedIntelligencePareto || []);
-const ordered = [...models].sort((a, b) =>
-  Number(b.rankingEligible) - Number(a.rankingEligible)
-  || (b.bestModelIntelligenceScore ?? -1) - (a.bestModelIntelligenceScore ?? -1)
-  || a.name.localeCompare(b.name)
-);
-const coverageCounts = ordered.reduce((acc, row) => {
-  acc[row.benchmarkCoverage] = (acc[row.benchmarkCoverage] || 0) + 1;
-  return acc;
-}, {});
-const directRows = ordered.filter((row) => row.rankingEligible);
-const providers = [...new Set(directRows.flatMap((row) => row.planIds.map((id) => planById.get(id)?.provider).filter(Boolean)))].sort();
+import guide from '../data/buyer-guide.json';
+const models = [...guide.models].sort((a, b) => (b.intelligence ?? -1) - (a.intelligence ?? -1) || a.name.localeCompare(b.name));
+const money = (value) => typeof value === 'number' ? `$${value.toFixed(value < .01 ? 5 : 3)}` : '—';
 ---
-<BaseLayout title="Models" description="Every model route advertised by a tracked coding subscription, with direct external intelligence, cost, speed and native-agent evidence or an explicit unresolved label.">
-  <section class="page-intro">
-    <p class="eyebrow">{models.length} advertised model labels</p>
-    <h1>Every model route gets evidence or an explicit reason it cannot be ranked.</h1>
-    <p class="lede">Exact checkpoints inherit only their own external results. Broad catalogs, managed-agent labels, newly released models, and ambiguous family names remain searchable without borrowing a nearby model’s score.</p>
-  </section>
-
-  <section class="section compact">
-    <div class="kpi-grid">
-      <article class="kpi-card"><strong>{directRows.length}</strong><span>direct external model or agent matches</span></article>
-      <article class="kpi-card"><strong>{coverageCounts['direct-agent-and-model'] || 0}</strong><span>direct model and native-agent evidence</span></article>
-      <article class="kpi-card"><strong>{coverageCounts['direct-model'] || 0}</strong><span>direct model-only evidence</span></article>
-      <article class="kpi-card"><strong>{(coverageCounts['no-external-benchmark'] || 0) + (coverageCounts['catalog-only'] || 0)}</strong><span>visible but excluded from rankings</span></article>
-    </div>
-  </section>
-
-  <section class="section compact">
-    <div class="callout"><strong>Fable 5 is present as a direct model and native Claude Code route.</strong> Search for “Fable” below to see its Intelligence Index, normalized token price, output speed, native agent score, Max plan routes, and Pro PAYG-only access semantics.</div>
-  </section>
-
-  <section class="section compact">
-    <div class="toolbar model-toolbar">
-      <div class="control"><label for="model-search">Search model or plan</label><input id="model-search" data-model-search type="search" placeholder="Fable, Opus, Kimi, GLM…" /></div>
-      <div class="control"><label for="model-coverage">Evidence coverage</label><select id="model-coverage" data-model-coverage><option value="all">All labels</option><option value="ranked">Direct evidence</option><option value="direct-agent-and-model">Model + agent</option><option value="direct-model">Model only</option><option value="direct-agent">Agent only</option><option value="no-external-benchmark">No direct benchmark</option><option value="catalog-only">Broad catalog</option></select></div>
-      <div class="control"><label for="model-provider">Subscription provider</label><select id="model-provider" data-model-provider><option value="all">All providers</option>{providers.map((provider) => <option value={provider}>{provider}</option>)}</select></div>
-      <div class="control"><label for="model-sort">Sort</label><select id="model-sort" data-model-sort><option value="intelligence-desc">Intelligence ↓</option><option value="price-density">$/intelligence ↑</option><option value="speed-desc">Output speed ↓</option><option value="name">Name</option></select></div>
-    </div>
-    <p class="results-count" data-model-results-count>{models.length} model labels</p>
-    <div class="panel"><div class="table-shell"><table data-model-table>
-      <thead><tr><th>Model route</th><th>Tracked plans</th><th>Coverage</th><th>Model intelligence</th><th>7:2:1 blend/M</th><th>$/M/intelligence point</th><th>Output speed</th><th>Best native agent index</th><th>Frontier</th></tr></thead>
-      <tbody>{ordered.map((row) => {
-        const rowPlans = row.planIds.map((id) => planById.get(id)).filter(Boolean);
-        const providerNames = [...new Set(rowPlans.map((plan) => plan.provider))];
-        const directModelIds = row.directModelBenchmarkIds || [];
-        const isPriceFront = directModelIds.some((id) => priceFront.has(id));
-        const isSpeedFront = directModelIds.some((id) => speedFront.has(id));
-        return (
-          <tr
-            data-model-row
-            data-search={`${row.name} ${row.resolvedModelVersion || ''} ${rowPlans.map((plan) => `${plan.provider} ${plan.name}`).join(' ')}`.toLowerCase()}
-            data-coverage={row.benchmarkCoverage}
-            data-ranked={String(row.rankingEligible)}
-            data-providers={providerNames.join('|')}
-            data-intelligence={row.bestModelIntelligenceScore ?? -1}
-            data-density={row.blendedUsdPerIntelligencePoint ?? 999999}
-            data-speed={row.bestModelOutputTokensPerSecond ?? -1}
-            data-name={row.name}
-          >
-            <td><strong>{row.name}</strong><span class="cell-sub">{row.resolvedModelVersion || row.exclusionReason}</span></td>
-            <td><span class="numeric-inline">{row.planCount}</span><span class="cell-sub">{providerNames.join(', ')}</span></td>
-            <td><span class={`coverage-pill ${row.benchmarkCoverage}`}>{row.benchmarkCoverage}</span></td>
-            <td class="numeric"><strong>{row.bestModelIntelligenceScore ?? '—'}</strong></td>
-            <td class="numeric">{row.bestModelBlendedPricePerMUsd != null ? `$${row.bestModelBlendedPricePerMUsd.toFixed(3)}` : '—'}</td>
-            <td class="numeric">{row.blendedUsdPerIntelligencePoint != null ? `$${row.blendedUsdPerIntelligencePoint.toFixed(5)}` : '—'}</td>
-            <td class="numeric">{row.bestModelOutputTokensPerSecond != null ? `${row.bestModelOutputTokensPerSecond.toFixed(1)} t/s` : '—'}</td>
-            <td class="numeric">{row.bestCodingAgentScore ?? '—'}</td>
-            <td>{isPriceFront && <span class="pareto-chip">price</span>} {isSpeedFront && <span class="pareto-chip">speed</span>}</td>
-          </tr>
-        );
-      })}</tbody>
-    </table></div><div class="empty-state" data-model-empty>No model route matches those filters.</div></div>
-  </section>
-
-  <section class="section compact"><div class="callout warning"><strong>“No direct benchmark” does not mean the model is bad.</strong> It means the exact checkpoint or native route has not been independently measured in the imported sources. Those rows are excluded from intelligence and quality-adjusted Pareto calculations until evidence exists.</div></section>
+<BaseLayout title="Models" description="External intelligence, API token prices, coding-task evidence, and subscription-route coverage for every modeled coding LLM.">
+  <section class="page-intro"><p class="eyebrow">Model evidence layer</p><h1>Compare the models before comparing the subscriptions that sell them.</h1><p class="lede">Each score remains attached to its exact external source and task harness. Subscription routes inherit only an exact model match; broad catalog labels receive no borrowed score.</p></section>
+  <section class="section compact"><div class="panel"><div class="table-shell"><table>
+    <thead><tr><th>Model</th><th>Provider</th><th>Intelligence</th><th>Standard API $/M</th><th>Agentic API $/M</th><th>$/M/intelligence point</th><th>Speed</th><th>Subscription routes</th><th>Task benchmark</th></tr></thead>
+    <tbody>{models.map((model) => (
+      <tr><td><strong>{model.name}</strong><span class="cell-sub">{model.id}</span></td><td>{model.provider}</td><td class="numeric"><span class={`score ${(model.intelligence || 0) < 50 ? 'low' : ''}`}>{model.intelligence?.toFixed(1) ?? '—'}</span></td><td class="numeric">{money(model.standardApiUsdPerM)}</td><td class="numeric">{money(model.agenticApiUsdPerM)}</td><td class="numeric">{money(model.agenticApiUsdPerMPerIntelligencePoint)}</td><td class="numeric">{model.speed != null ? `${model.speed.toFixed(1)} t/s` : '—'}</td><td class="numeric">{model.subscriptionRouteCount}</td><td>{model.taskBenchmark ? <><strong>{(model.taskBenchmark.passRate * 100).toFixed(1)}%</strong><span class="cell-sub">{model.taskBenchmark.benchmark} · {model.taskBenchmark.harness}</span></> : '—'}</td></tr>
+    ))}</tbody>
+  </table></div></div></section>
 </BaseLayout>

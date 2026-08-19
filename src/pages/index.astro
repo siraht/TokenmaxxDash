@@ -1,162 +1,87 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
-import plans from '../data/plans.json';
-import benchmarks from '../data/benchmarks.json';
-import leaders from '../data/leaders.json';
-import summary from '../data/summary.json';
-import taskEstimates from '../data/subscription-task-estimates.json';
-import { formatNumber, statusLabel } from '../lib/format';
+import guide from '../data/buyer-guide.json';
 
-const benchmarkById = new Map(benchmarks.map((row) => [row.id, row]));
-const taskById = new Map(taskEstimates.map((row) => [row.id, row]));
-const planById = new Map(plans.map((row) => [row.id, row]));
-
-const nativeBudgetFront = (leaders.subscriptionTaskBudgetParetoByQualityFloor?.frontier || [])
-  .map((id) => taskById.get(id))
-  .filter(Boolean)
-  .sort((a, b) => b.score - a.score || a.priceMonthly - b.priceMonthly || a.subscriptionUsdPerExpectedPassHigh - b.subscriptionUsdPerExpectedPassHigh)
-  .slice(0, 12);
-
-const costQualityFront = (leaders.codingAgentCostQualityPareto || [])
-  .map((id) => benchmarkById.get(id))
-  .filter(Boolean)
-  .sort((a, b) => b.score - a.score);
-
-const fableAgent = benchmarkById.get('aa-agent-claude-code-fable-5-max-fallback');
-const fableModel = benchmarkById.get('aa-model-claude-fable-5-max');
-const fableTerminal = benchmarkById.get('terminal-bench-2-1-claude-code-fable-5-xhigh');
-
-const claudePlans = ['claude-code-pro', 'claude-code-max-5x', 'claude-code-max-20x']
-  .map((id) => planById.get(id))
-  .filter(Boolean);
-
-const rawAllowanceLeaders = (leaders.rawSubsidyLeaders || [])
-  .map((id) => planById.get(id))
-  .filter(Boolean)
-  .slice(0, 8);
+const routeById = new Map(guide.rows.map((row) => [row.id, row]));
+const confidenceLabel = (value) => ({ official: 'Official', derived: 'Derived', measured: 'Measured', 'measured-low': 'Measured range', 'official-partial': 'Official partial', secondary: 'Secondary' }[value] || value || 'Unknown');
+const money = (value, digits = 3) => typeof value === 'number' ? `$${value.toFixed(digits)}` : '—';
+const number = (value, digits = 1) => typeof value === 'number' ? value.toLocaleString('en-US', { maximumFractionDigits: digits }) : '—';
+const metricText = (row, mix, key) => {
+  const value = row[mix]?.[key];
+  if (typeof value !== 'number') return '—';
+  return `$${value.toFixed(value < .01 ? 5 : 3)}`;
+};
+const bandById = new Map((guide.recommendationBands || []).map((band) => [band.id, band]));
+const shortlist = Object.entries(guide.shortlists.standard || {}).map(([band, ids]) => ({ band, row: routeById.get(ids?.[0]) })).filter((entry) => entry.row);
+const baselines = guide.planSummaries.filter((plan) => ['OpenAI Codex', 'Claude Code', 'Grok Build', 'Synthetic'].includes(plan.provider));
+const rows = [...guide.rows].sort((a, b) => (a.standard.qualityAdjustedUsdPerM ?? Infinity) - (b.standard.qualityAdjustedUsdPerM ?? Infinity));
 ---
 <BaseLayout title="Tokenmaxx">
   <section class="hero">
     <div>
-      <p class="eyebrow">Coding-plan economics, quality first</p>
-      <h1>Buy successful work, not impressive-looking token totals.</h1>
-      <p class="lede">Tokenmaxx joins externally measured model intelligence and native-agent performance to each plan’s published or inferred allowance. Raw subsidy remains visible, but it can’t outrank a stronger model merely by selling more cheap tokens.</p>
-      <div class="hero-actions">
-        <a class="button primary" href="/leaders">Explore quality-gated leaders</a>
-        <a class="button" href="/models">Compare every model route</a>
-        <a class="button subtle" href="/plans">Inspect every plan</a>
-      </div>
+      <p class="eyebrow">Every monthly coding subscription, one useful comparison</p>
+      <h1>Find the most capable model tokens your next subscription can buy.</h1>
+      <p class="lede">Compare each plan × model route by effective subscription dollars per million tokens, external intelligence, coding-task success, and cost per successful benchmark-equivalent task. Claude Code, Codex, Grok, Synthetic, and every alternative stay visible by default.</p>
     </div>
-    <aside class="verdict-card">
-      <p class="section-kicker">Default comparison gate</p>
-      <strong>≥60</strong>
-      <span>direct external model-intelligence score</span>
-      <p>Below this line, a plan can still lead a low-cost or high-volume frontier, but it won’t displace frontier-quality routes in the default recommendation surface.</p>
-    </aside>
+    <aside class="hero-side"><strong>{guide.summary.planCount}</strong><span>monthly plans researched</span><p>{guide.summary.comparableRouteCount} token-comparable routes, {guide.summary.requestRouteCount} request-comparable routes, and {guide.summary.unquantifiedPlanCount} plans whose exact missing denominator is documented.</p></aside>
   </section>
 
-  <section class="section compact" aria-label="Catalog summary">
-    <div class="kpi-grid">
-      <article class="kpi-card"><strong>{summary.planCount}</strong><span>subscription tiers cataloged</span></article>
-      <article class="kpi-card"><strong>{summary.modelRouteCount}</strong><span>advertised model labels resolved</span></article>
-      <article class="kpi-card"><strong>{summary.directBenchmarkModelRouteCount}</strong><span>labels with direct external evidence</span></article>
-      <article class="kpi-card"><strong>{summary.subscriptionTaskEstimateCount}</strong><span>native plan/task joins calculated</span></article>
-    </div>
+  <section class="section compact"><div class="kpis">
+    <article class="kpi"><strong>{guide.summary.comparisonClassCounts?.token || 0}</strong><span>token-denominated plans</span></article>
+    <article class="kpi"><strong>{guide.summary.comparisonClassCounts?.request || 0}</strong><span>request-denominated plans</span></article>
+    <article class="kpi"><strong>{guide.summary.comparisonClassCounts?.managed || 0}</strong><span>managed/work-unit plans</span></article>
+    <article class="kpi"><strong>{guide.summary.comparisonClassCounts?.['provider-hidden'] || 0}</strong><span>provider-hidden numeric pools</span></article>
+  </div></section>
+
+  <section class="section">
+    <div class="section-heading"><div><p class="section-kicker">Universal shortlist</p><h2>Best value at common monthly budgets</h2></div><p>These cards include every provider, including plans marked as already owned. Hide-owned is an optional filter below.</p></div>
+    <div class="shortlist-grid">{shortlist.map(({ band, row }) => (
+      <a class="shortlist-card" href={`/plans/${row.planId}`}><span class="budget">{bandById.get(band)?.label || band}</span><h3>{row.provider} · {row.plan}</h3><p>{row.model} · intelligence {row.intelligence ?? '—'} · coding {row.codingScore?.toFixed(0) ?? '—'}</p><span class="metric">{money(row.standard.qualityAdjustedUsdPerM, 4)}</span><span class="metric-label">quality-adjusted subscription $ / 1M raw tokens</span></a>
+    ))}</div>
   </section>
 
   <section class="section">
-    <div class="section-heading">
-      <div><p class="section-kicker">Native subscription economics</p><h2>The default frontier now includes Claude Code and Codex.</h2></div>
-      <p>These rows require a native external agent result, a directly matched model route, and a quantified subscription denominator. The quality floor is 60, so raw allowance alone cannot enter.</p>
+    <div class="section-heading"><div><p class="section-kicker">Plan × model comparison</p><h2>Sort by the metric that matches your workload</h2></div><p>Standardized is 70% cache reads, 20% fresh input, and 10% output. Agentic high-cache uses public coding-agent telemetry.</p></div>
+    <div class="toolbar">
+      <div class="control"><label for="buyer-search">Search</label><input id="buyer-search" data-buyer-search type="search" placeholder="OpenCode, Luna, Kimi, Claude…" /></div>
+      <div class="control"><label for="buyer-mix">Token mix</label><select id="buyer-mix" data-buyer-mix><option value="standard">Standardized 7:2:1</option><option value="agentic">Agentic high-cache</option></select></div>
+      <div class="control"><label for="buyer-quality">Minimum intelligence</label><select id="buyer-quality" data-buyer-quality><option value="0">All scored models</option><option value="40">40+</option><option value="50">50+</option><option value="55">55+</option></select></div>
+      <div class="control"><label for="buyer-budget">Maximum price</label><select id="buyer-budget" data-buyer-budget><option value="10000">Any price</option><option value="10">$10</option><option value="25">$25</option><option value="50">$50</option><option value="100">$100</option><option value="200">$200</option></select></div>
+      <div class="control"><label for="buyer-evidence">Evidence</label><select id="buyer-evidence" data-buyer-evidence><option value="all">All evidence</option><option value="primary">Official + measured</option><option value="official">Official only</option></select></div>
+      <div class="control"><label for="buyer-sort">Sort</label><select id="buyer-sort" data-buyer-sort><option value="quality-cost">Quality-adjusted $/M</option><option value="token-cost">Subscription $/M</option><option value="task-cost">$/successful task</option><option value="intelligence">Intelligence</option><option value="coding">Coding score</option><option value="tokens">Monthly raw tokens</option><option value="price">Plan price</option></select></div>
+      <div class="control checkbox-control"><label><input type="checkbox" data-buyer-owned /> Hide plans I already own</label></div>
     </div>
-    <div class="panel">
-      <div class="table-shell"><table>
-        <thead><tr><th>Plan / tested route</th><th>Agent index</th><th>Price</th><th>Expected passes/month</th><th>Subscription $/expected pass</th><th>Evidence</th></tr></thead>
-        <tbody>{nativeBudgetFront.map((row) => (
-          <tr>
-            <td><a href={`/plans/${row.planId}`}><strong>{row.provider} · {row.plan}</strong></a><span class="cell-sub">{row.agent} · {row.benchmarkModel}</span></td>
-            <td class="numeric"><strong>{row.score}</strong></td>
-            <td class="numeric">${row.priceMonthly}/mo</td>
-            <td class="numeric">{formatNumber(row.expectedBenchmarkPassesPerAverageMonthLow)}–{formatNumber(row.expectedBenchmarkPassesPerAverageMonthHigh)}</td>
-            <td class="numeric"><strong>${row.subscriptionUsdPerExpectedPassLow.toFixed(3)}–${row.subscriptionUsdPerExpectedPassHigh.toFixed(3)}</strong></td>
-            <td><span class={`badge ${row.evidenceConfidence}`}>{row.evidenceConfidence}</span><span class="cell-sub">API-cost counterfactual mapped into the measured or published plan pool</span></td>
-          </tr>
-        ))}</tbody>
-      </table></div>
-    </div>
-  </section>
-
-  <section class="section">
-    <div class="section-heading">
-      <div><p class="section-kicker">Previously missing</p><h2>Fable 5 is now a first-class model and native-agent route.</h2></div>
-      <p>Its model score, Claude Code score, Terminal-Bench result, API pricing, subscription access mode, and Max-only 50% weekly-meter ceiling are tracked separately.</p>
-    </div>
-    <div class="fable-grid">
-      <article class="feature-card purple">
-        <span class="feature-label">Model intelligence</span>
-        <strong>{fableModel?.score ?? '—'}</strong>
-        <h3>Claude Fable 5 · max</h3>
-        <p>{fableModel ? `$${fableModel.blendedPricePerMUsd.toFixed(2)}/M under the 7:2:1 external pricing convention, ${fableModel.outputTokensPerSecond.toFixed(1)} output tok/s.` : 'External model row unavailable.'}</p>
-      </article>
-      <article class="feature-card purple">
-        <span class="feature-label">Native coding agent</span>
-        <strong>{fableAgent?.score ?? '—'}</strong>
-        <h3>Claude Code · Fable 5</h3>
-        <p>{fableAgent ? `$${fableAgent.apiCostPerTaskUsd.toFixed(2)} API-priced cost/task and ${fableAgent.timePerTaskMinutes.toFixed(1)} minutes/task in the imported Coding Agent Index.` : 'External agent row unavailable.'}</p>
-      </article>
-      <article class="feature-card purple">
-        <span class="feature-label">Terminal-Bench 2.1</span>
-        <strong>{fableTerminal ? `${fableTerminal.score}%` : '—'}</strong>
-        <h3>Claude Code · Fable 5 xhigh</h3>
-        <p>Max includes Fable inside the shared quota but caps it at 50% of the weekly meter. Pro starts Fable on PAYG credits, so it receives no fake included-token estimate.</p>
-      </article>
-    </div>
-  </section>
-
-  <section class="section">
-    <div class="section-heading">
-      <div><p class="section-kicker">Claude Code allowance inference</p><h2>All three plans now have calculated token-cost ranges.</h2></div>
-      <p>Raw tokens come from ccusage/dashboard measurements; API-equivalent ranges come from observed weekly burn. Both are workload-dependent because Anthropic keeps the meter weights hidden.</p>
-    </div>
-    <div class="panel"><div class="table-shell"><table>
-      <thead><tr><th>Claude plan</th><th>Measured raw tokens/week</th><th>Average raw tokens/month</th><th>Full-utilization subscription $/M raw</th><th>Measured API-equivalent/month</th><th>Value multiple</th></tr></thead>
-      <tbody>{claudePlans.map((plan) => (
-        <tr>
-          <td><a href={`/plans/${plan.id}`}><strong>{plan.name}</strong></a><span class="cell-sub">${plan.priceMonthly}/mo · shared Claude + Code limits</span></td>
-          <td class="numeric">{plan.quotas.weeklyRawTokensBillionLow.toFixed(2)}–{plan.quotas.weeklyRawTokensBillionHigh.toFixed(2)}B</td>
-          <td class="numeric">{plan.quotas.averageMonthlyRawTokensBillionLow.toFixed(2)}–{plan.quotas.averageMonthlyRawTokensBillionHigh.toFixed(2)}B</td>
-          <td class="numeric"><strong>${plan.quotas.subscriptionUsdPerMillionRawTokensLow.toFixed(4)}–${plan.quotas.subscriptionUsdPerMillionRawTokensHigh.toFixed(4)}</strong></td>
-          <td class="numeric">${formatNumber(plan.quotas.averageMonthlyApiEquivalentUsdLow)}–${formatNumber(plan.quotas.averageMonthlyApiEquivalentUsdHigh)}</td>
-          <td class="numeric">{plan.valueMultipleLow.toFixed(2)}–{plan.valueMultipleHigh.toFixed(2)}×</td>
+    <div class="results-line"><span data-buyer-count>{rows.length} comparable routes</span><span>Owned status is personal metadata, never a default exclusion.</span></div>
+    <div class="panel" style="margin-top:10px"><div class="table-shell"><table data-buyer-table>
+      <thead><tr><th>#</th><th>Subscription / model</th><th>Price</th><th>Intelligence</th><th>Coding</th><th>Route API $/M</th><th>Raw tokens/mo</th><th>Subscription $/M</th><th>Quality-adjusted $/M</th><th>$/successful task</th><th>Evidence</th></tr></thead>
+      <tbody>{rows.map((row, index) => (
+        <tr data-buyer-row data-search={`${row.provider} ${row.plan} ${row.model} ${row.modelProvider}`.toLowerCase()} data-owned={String(row.owned)} data-confidence={row.confidence} data-price={row.priceUsd} data-intelligence={row.intelligence ?? -1} data-coding={row.codingScore ?? -1}
+          data-standard-rate={row.standard.apiRatePerM ?? ''} data-standard-tokens={row.standard.monthlyTokensM ?? ''} data-standard-cost={row.standard.subscriptionUsdPerM ?? ''} data-standard-quality-cost={row.standard.qualityAdjustedUsdPerM ?? ''} data-standard-task-cost={row.standard.subscriptionUsdPerSuccessfulTask ?? ''}
+          data-agentic-rate={row.agentic.apiRatePerM ?? ''} data-agentic-tokens={row.agentic.monthlyTokensM ?? ''} data-agentic-cost={row.agentic.subscriptionUsdPerM ?? ''} data-agentic-quality-cost={row.agentic.qualityAdjustedUsdPerM ?? ''} data-agentic-task-cost={row.agentic.subscriptionUsdPerSuccessfulTask ?? ''}>
+          <td class="numeric"><span class="rank-number" data-row-rank>{index + 1}</span></td>
+          <td class="cell-stack"><a href={`/plans/${row.planId}`}><strong>{row.provider} · {row.plan}</strong></a><span class="cell-sub">{row.model} · {row.standard.rateBasis}</span>{row.owned && <span class="badge owned" style="margin-top:5px">Owned</span>}</td>
+          <td class="numeric">${row.priceUsd.toFixed(2)}</td><td class="numeric"><span class={`score ${(row.intelligence || 0) < 50 ? 'low' : ''}`}>{row.intelligence?.toFixed(1) ?? '—'}</span></td><td class="numeric">{row.codingScore?.toFixed(1) ?? '—'}</td>
+          <td class="numeric"><span data-metric-standard={metricText(row, 'standard', 'apiRatePerM')} data-metric-agentic={metricText(row, 'agentic', 'apiRatePerM')}>{metricText(row, 'standard', 'apiRatePerM')}</span></td>
+          <td class="numeric"><span data-metric-standard={`${number(row.standard.monthlyTokensM, 1)}M`} data-metric-agentic={`${number(row.agentic.monthlyTokensM, 1)}M`}>{number(row.standard.monthlyTokensM, 1)}M</span></td>
+          <td class="numeric"><strong data-metric-standard={metricText(row, 'standard', 'subscriptionUsdPerM')} data-metric-agentic={metricText(row, 'agentic', 'subscriptionUsdPerM')}>{metricText(row, 'standard', 'subscriptionUsdPerM')}</strong></td>
+          <td class="numeric"><strong data-metric-standard={metricText(row, 'standard', 'qualityAdjustedUsdPerM')} data-metric-agentic={metricText(row, 'agentic', 'qualityAdjustedUsdPerM')}>{metricText(row, 'standard', 'qualityAdjustedUsdPerM')}</strong></td>
+          <td class="numeric"><span data-metric-standard={metricText(row, 'standard', 'subscriptionUsdPerSuccessfulTask')} data-metric-agentic={metricText(row, 'agentic', 'subscriptionUsdPerSuccessfulTask')}>{metricText(row, 'standard', 'subscriptionUsdPerSuccessfulTask')}</span></td>
+          <td><span class={`badge ${row.confidence}`}>{confidenceLabel(row.confidence)}</span><span class="cell-sub">{row.accessMode || 'included'}</span></td>
         </tr>
       ))}</tbody>
-    </table></div></div>
-    <div class="callout warning" style="margin-top:14px"><strong>These are measured ranges, not official token allowances.</strong> Each Claude plan page now also calculates pure-category estimates for Opus 5, Fable 5, Sonnet 5, and Haiku 4.5 across uncached input, cache reads, cache writes, and output.</div>
+    </table></div><div class="empty-state" data-buyer-empty>No route matches those filters.</div></div>
   </section>
 
   <section class="section">
-    <div class="section-heading">
-      <div><p class="section-kicker">External agent economics</p><h2>Quality versus API cost per expected pass</h2></div>
-      <p>This Pareto front is independent of subscriptions. It answers which externally tested agent configurations trade quality for provider-priced task cost most efficiently.</p>
-    </div>
-    <div class="panel"><div class="table-shell"><table>
-      <thead><tr><th>Agent / model</th><th>Index</th><th>API cost/task</th><th>API $/expected pass</th><th>Time/task</th></tr></thead>
-      <tbody>{costQualityFront.map((row) => (
-        <tr>
-          <td><strong>{row.agent}</strong><span class="cell-sub">{row.model}</span></td>
-          <td class="numeric">{row.score}</td>
-          <td class="numeric">${row.apiCostPerTaskUsd?.toFixed(2)}</td>
-          <td class="numeric"><strong>${row.apiUsdPerExpectedPass?.toFixed(3)}</strong></td>
-          <td class="numeric">{row.timePerTaskMinutes?.toFixed(1)}m</td>
-        </tr>
-      ))}</tbody>
-    </table></div></div>
+    <div class="section-heading"><div><p class="section-kicker">Baseline subscriptions</p><h2>Claude, Codex, Grok, and Synthetic remain in the public comparison</h2></div><p>Plans without a defensible token denominator still appear with their exact missing fields instead of fabricated token estimates.</p></div>
+    <div class="plan-grid">{baselines.map((plan) => (
+      <a class="plan-card" href={`/plans/${plan.id}`}><div class="topline"><div><strong>{plan.provider}</strong><span class="cell-sub">{plan.plan}</span></div><span class="price">${plan.priceUsd.toFixed(2)}</span></div><p>{plan.comparisonClass} · {plan.researchStatus}</p><div class="best"><strong>{plan.bestAgenticModel || 'No token denominator'}</strong><span class="cell-sub">{plan.bestAgenticQualityCost != null ? `${money(plan.bestAgenticQualityCost, 4)} quality-adjusted $/M` : plan.missingFields.join(' · ')}</span></div></a>
+    ))}</div>
   </section>
 
-  <section class="section compact">
-    <div class="section-heading"><div><p class="section-kicker">Raw allowance, deliberately last</p><h2>Large pools remain useful evidence, not a universal ranking.</h2></div><a class="button subtle" href="/plans">Inspect every denominator</a></div>
-    <div class="raw-leader-strip">{rawAllowanceLeaders.map((plan) => (
-      <a class="raw-leader" href={`/plans/${plan.id}`}><strong>{plan.valueDisplay}</strong><span>{plan.provider} · {plan.name}</span><small>{statusLabel(plan.calculationStatus)}</small></a>
+  <section class="section"><div class="section-heading"><div><p class="section-kicker">Every researched plan</p><h2>Token, request, managed, relative, and provider-hidden products</h2></div><a href="/plans">Open full plan catalog →</a></div>
+    <div class="plan-grid" data-plan-grid>{guide.planSummaries.map((plan) => (
+      <a class="plan-card" href={`/plans/${plan.id}`} data-plan-card data-search={`${plan.provider} ${plan.plan} ${plan.comparisonClass}`.toLowerCase()} data-provider={plan.provider} data-confidence={plan.confidence} data-quantified={plan.tokenRouteCount || plan.requestRouteCount ? 'yes' : 'no'} data-price={plan.priceUsd} data-quality-cost={plan.bestAgenticQualityCost ?? 999999}><div class="topline"><div><strong>{plan.provider}</strong><span class="cell-sub">{plan.plan}</span></div><span class="price">${plan.priceUsd.toFixed(2)}</span></div><p>{plan.comparisonClass} · {plan.researchStatus}</p><div class="best"><strong>{plan.bestAgenticModel || `${plan.allowanceKind} allowance`}</strong><span class="cell-sub">{plan.bestAgenticQualityCost != null ? `${money(plan.bestAgenticQualityCost, 4)} quality-adjusted $/M` : plan.missingFields.slice(0, 2).join(' · ')}</span></div></a>
     ))}</div>
   </section>
 </BaseLayout>

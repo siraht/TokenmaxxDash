@@ -7,10 +7,9 @@ interface Props {
   description?: string;
   canonical?: string;
 }
-
 const {
   title,
-  description = 'Compare monthly AI coding subscriptions by effective tokens, external model intelligence, and cost per successful benchmark task.',
+  description = 'Compare every monthly AI coding subscription by effective model tokens, external intelligence, and cost per successful benchmark task.',
   canonical
 } = Astro.props;
 const pageTitle = title === 'Tokenmaxx' ? title : `${title} · Tokenmaxx`;
@@ -31,7 +30,7 @@ const canonicalUrl = canonical || new URL(Astro.url.pathname, Astro.site || Astr
       <Nav />
       <main><slot /></main>
       <footer class="site-footer">
-        <p>Snapshot: 18 August 2026. Default view excludes the owner’s Codex, Grok, and Synthetic subscriptions.</p>
+        <p>Snapshot: 19 August 2026. Claude, Codex, Grok, Synthetic, and every alternative are visible by default.</p>
         <div>
           <a href="/data/buyer-guide.json">Download data</a>
           <a href="/methodology">Calculation math</a>
