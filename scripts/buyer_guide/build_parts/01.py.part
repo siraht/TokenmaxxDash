@@ -1,0 +1,121 @@
+"""Calculation and output stage for the buying guide."""
+from __future__ import annotations
+
+import json
+from pathlib import Path
+from typing import Any
+
+from .models import AS_OF, EUR_USD, MIXES, MODELS, TASKS
+from .plans import PLANS
+
+ROOT = Path(__file__).resolve().parents[2]
+DATA = ROOT / "src" / "data"
+PUBLIC = ROOT / "public" / "data"
+DATA.mkdir(parents=True, exist_ok=True)
+PUBLIC.mkdir(parents=True, exist_ok=True)
+
+def blend_rate(model: dict[str, Any], mix: dict[str, float], route_rates: dict[str, float] | None = None) -> float | None:
+    rates = route_rates or {
+        "fresh": model.get("input"), "cache": model.get("cache"), "output": model.get("output"),
+    }
+    if rates.get("fresh") is None or rates.get("output") is None:
+        return None
+    cache = rates.get("cache") if rates.get("cache") is not None else rates["fresh"]
+    return mix["fresh"] * rates["fresh"] + mix["cache"] * cache + mix["output"] * rates["output"]
+
+
+def compute_capacity(plan: dict[str, Any], model_id: str, mix: dict[str, float]) -> dict[str, Any]:
+    allowance = plan["allowance"]
+    model = MODELS[model_id]
+    kind = allowance["kind"]
+    route_rates = plan.get("routeRates", {}).get(model_id)
+    api_rate = blend_rate(model, mix, route_rates)
+    out: dict[str, Any] = {
+        "kind": kind, "apiRatePerM": api_rate,
+        "rateBasis": "subscription route" if route_rates else "public model API",
+    }
+    if kind == "apiPool" and api_rate:
+        pool = plan.get("monthlyUsdByModel", {}).get(model_id, allowance["monthlyUsd"])
+        out.update({"monthlyTokensM": pool / api_rate, "allowanceUsd": pool, "modelMonthlyUsageUsd": pool})
+    elif kind == "apiPoolRange" and api_rate:
+        low, center, high = allowance["monthlyUsdLow"], allowance["monthlyUsd"], allowance["monthlyUsdHigh"]
+        out.update({"monthlyTokensMLow": low / api_rate, "monthlyTokensM": center / api_rate, "monthlyTokensMHigh": high / api_rate, "allowanceUsdLow": low, "allowanceUsd": center, "allowanceUsdHigh": high})
+    elif kind == "credits":
+        rates = allowance.get("creditRatesPerM", {}).get(model_id)
+        if rates:
+            credits_per_m = mix["fresh"] * rates["fresh"] + mix["cache"] * rates["cache"] + mix["output"] * rates["output"]
+            out.update({"creditsPerM": credits_per_m, "monthlyTokensM": allowance["monthlyCredits"] / credits_per_m})
+            if api_rate:
+                out["allowanceUsd"] = out["monthlyTokensM"] * api_rate
+    elif kind in {"rawTokens", "rawTokensEstimate"}:
+        out["monthlyTokensM"] = allowance["monthlyTokens"] / 1e6
+        if api_rate:
+            out["allowanceUsd"] = out["monthlyTokensM"] * api_rate
+    elif kind == "requests":
+        per_request = allowance.get("quotaPerRequest", {}).get(model_id)
+        if per_request:
+            requests = allowance["monthlyQuota"] / per_request
+            out.update({"monthlyRequests": requests, "usdPer1000Requests": plan["priceUsd"] / requests * 1000})
+    return out
+
+
+def metric_bundle(plan: dict[str, Any], model_id: str, capacity: dict[str, Any]) -> dict[str, Any]:
+    score = MODELS[model_id].get("intelligence")
+    tokens_m = capacity.get("monthlyTokensM")
+    price = plan["priceUsd"]
+    bundle: dict[str, Any] = {}
+    if tokens_m and tokens_m > 0:
+        usd_per_m = price / tokens_m
+        bundle["subscriptionUsdPerM"] = usd_per_m
+        if score:
+            normalized = score / 100
+            bundle["qualityAdjustedUsdPerM"] = usd_per_m / normalized
+            bundle["qualityTokensMPerDollar"] = tokens_m * normalized / price
+    requests = capacity.get("monthlyRequests")
+    if requests and score:
+        bundle["qualityAdjustedUsdPer1000Requests"] = capacity["usdPer1000Requests"] / (score / 100)
+    task = TASKS.get(model_id)
+    if task:
+        bundle.update({
+            "codingScore": task["passRate"] * 100,
+            "taskBenchmark": task["benchmark"], "taskHarness": task["harness"],
+            "taskApiCost": task["apiCost"], "taskPassRate": task["passRate"],
+            "taskTokensM": task["tokensM"],
+            "externalApiUsdPerSuccessfulTask": task["apiCost"] / task["passRate"],
+            "taskSource": task["source"],
+        })
+        if tokens_m and tokens_m > 0:
+            attempts = tokens_m / task["tokensM"]
+            successes = attempts * task["passRate"]
+            bundle.update({
+                "monthlyTaskAttempts": attempts,
+                "monthlySuccessfulTasks": successes,
+                "subscriptionUsdPerSuccessfulTask": price / successes if successes else None,
+            })
+    return bundle
+
+
+
+def main() -> None:
+    rows: list[dict[str, Any]] = []
+    request_rows: list[dict[str, Any]] = []
+    unquantified: list[dict[str, Any]] = []
+    for plan in PLANS:
+        produced = False
+        for model_id in plan["models"]:
+            if model_id not in MODELS:
+                continue
+            model = MODELS[model_id]
+            row = {
+                "id": f"{plan['id']}--{model_id}",
+                "planId": plan["id"], "provider": plan["provider"], "plan": plan["plan"],
+                "priceUsd": plan["priceUsd"], "owned": plan["owned"], "modelId": model_id,
+                "model": model["name"], "modelProvider": model["provider"],
+                "intelligence": model.get("intelligence"), "codingScore": (TASKS.get(model_id) or {}).get("passRate", 0) * 100 or None, "speed": model.get("speed"),
+                "modelSource": model.get("source"), "planSource": plan["source"],
+                "confidence": plan["confidence"], "policy": plan["policy"], "windows": plan.get("windows"),
+                "note": plan.get("note"), "benchmarkConfidence": model.get("benchmarkConfidence", "primary"),
+                "routeNote": plan.get("routeNotes", {}).get(model_id) or model.get("routeNote"),
+            }
+            for mix_id, mix in MIXES.items():
+                cap = compute_capacity(plan, model_id, mix)

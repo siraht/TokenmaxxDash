@@ -1,0 +1,36 @@
+            "deepseek-v4-flash": "Command lists 17 off-peak and 7 peak hours daily; the dashboard uses the time-weighted all-day billed rate.",
+            "gemini-3.7-flash": "Promotional 50% route price through December 31, 2026.",
+            "mimo-v2.5": "Permanent discounted Command route price is used.",
+            "mimo-v2.5-pro": "Permanent discounted Command route price is used.",
+        },
+        windows=f"${h5}/5h · ${week}/week · up to ${pool}/month",
+        source=f"https://commandcode.ai/docs/plans/{'max' if name.startswith('Max') else name.lower()}",
+        policy="API-compatible" if name != "Go" else "interactive coding",
+        note=tier_note,
+    )
+for name, price, pool in [("Plus", 10, 50), ("Pro", 20, 100)]:
+    add("Chutes", name, price, id=f"chutes-{name.lower()}", models=["deepseek-v4-flash", "qwen3.8-max", "kimi-k3", "glm-5.2", "minimax-m3", "mimo-v2.5-pro"], allowance={"kind": "apiPool", "monthlyUsd": pool}, windows="4-hour dollar window plus daily request ceiling", source="https://chutes.ai/", confidence="secondary", policy="API-compatible")
+add("Synthetic", "Pack", 30, id="synthetic-pack", models=["glm-5.2", "kimi-k3", "minimax-m3", "qwen3.7-max", "deepseek-v4-flash", "mimo-v2.5-pro"], allowance={"kind": "apiPool", "monthlyUsd": 24 * WEEKS_PER_MONTH}, windows="500 weighted requests/5h + $24 API credits/week", source="https://synthetic.new/rate-limits", owned=True, policy="API-compatible")
+for name, price, pool in [("Lite", 29, 87), ("Pro", 79, 237), ("Max", 179, 537)]:
+    add("LLM Gateway DevPass", name, price, id=f"devpass-{name.lower()}", models=OPEN_CATALOG, allowance={"kind": "apiPool", "monthlyUsd": pool}, source="https://codingplans.cc/", confidence="secondary", policy="API-compatible")
+for name, price, pool in [("Starter", 19, 26.6), ("Pro", 49, 68.6), ("Expert", 199, 278.6)]:
+    add("Kilo Pass", name, price, id=f"kilo-{name.lower()}", models=TOP_CATALOG, allowance={"kind": "apiPool", "monthlyUsd": pool}, source="https://kilo.ai/pricing", policy="interactive coding", note="Uses mature 40% monthly loyalty bonus; first month and annual values differ.")
+for name, price, pool in [("Pro", 10, 15), ("Pro+", 39, 70), ("Max", 100, 200)]:
+    add("GitHub Copilot", name, price, id=f"copilot-{name.lower().replace('+','plus')}", models=TOP_CATALOG, allowance={"kind": "apiPool", "monthlyUsd": pool}, source="https://docs.github.com/en/copilot/concepts/billing/individual-plans", policy="interactive coding", note="AI-credit pool; unlimited completions are a separate included benefit.")
+for name, price, pool in [("Pro", 20, 20), ("Pro+", 60, 70), ("Ultra", 200, 400)]:
+    add("Cursor", name, price, id=f"cursor-{name.lower().replace('+','plus')}", models=["claude-opus-5", "claude-fable-5", "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna", "grok-4.5", "claude-sonnet-5", "kimi-k3", "composer-2.5"], allowance={"kind": "apiPool", "monthlyUsd": pool}, source="https://cursor.com/docs/models-and-pricing", policy="interactive coding", note="Guaranteed third-party pool only; first-party Cursor model pool adds unquantified value.")
+add("Mistral Vibe", "Pro", 14.99, id="mistral-vibe-pro", models=[], allowance={"kind": "apiPool", "monthlyUsd": 30}, source="https://mistral.ai/pricing/", policy="interactive coding", note="$30 explicit API credit; fair-use Vibe allowance is extra but unquantified.")
+
+# StepFun's official 7M credits ≈ $1 conversion makes these equivalent to dollar pools.
+for name, price, credits in [("Flash Mini", 6.99, 400_000_000), ("Flash Plus", 9.99, 1_600_000_000), ("Flash Pro", 29, 8_000_000_000), ("Flash Max", 99, 40_000_000_000)]:
+    add("StepFun", name, price, id=f"stepfun-{name.lower().replace(' ','-')}", models=["step-3.7-flash"], allowance={"kind": "apiPool", "monthlyUsd": credits / 7_000_000, "credits": credits}, source="https://platform.stepfun.ai/docs/en/step-plan/overview", policy="coding tools", note="No 5-hour window; credits expire monthly.")
+
+# Weighted credit pools.
+for name, price, credits in [("Lite", 6, 4.1e9), ("Standard", 16, 11e9), ("Pro", 50, 38e9), ("Max", 100, 82e9)]:
+    add("Xiaomi MiMo Token Plan", name, price, id=f"mimo-{name.lower()}", models=["mimo-v2.5", "mimo-v2.5-pro"], allowance={"kind": "credits", "monthlyCredits": credits, "creditRatesPerM": {"mimo-v2.5": {"fresh": 100_000_000, "cache": 2_000_000, "output": 200_000_000}, "mimo-v2.5-pro": {"fresh": 300_000_000, "cache": 2_500_000, "output": 600_000_000}}}, source="https://mimo.mi.com/docs/en-US/tokenplan/Token%20Plan/subscription", policy="interactive coding only", note="Official terms prohibit automated scripts and custom application backends.")
+for name, price, weekly in [("Lite", 18, 10_000), ("Pro", 80, 60_000), ("Max", 168, 140_000)]:
+    add("Z.AI Coding Plan", name, price, id=f"zai-{name.lower()}", models=["glm-5.3", "glm-5-turbo", "glm-4.7"], allowance={"kind": "credits", "monthlyCredits": weekly * WEEKS_PER_MONTH, "creditRatesPerM": {"glm-5.3": {"fresh": 690, "cache": 170, "output": 2400}, "glm-5-turbo": {"fresh": 570, "cache": 150, "output": 2100}, "glm-4.7": {"fresh": 460, "cache": 120, "output": 1600}}}, windows=f"{weekly:,} credits/week; 50% off-peak deduction", source="https://docs.z.ai/devpack/overview", policy="interactive coding")
+for name, price_cny, weekly in [("Personal Lite", 39, 2500), ("Personal Standard", 139, 10_000), ("Personal Pro", 499, 40_000)]:
+    add("Alibaba Token Plan", name, price_cny * 0.139, originalPrice=price_cny, currency="CNY", id=f"alibaba-{name.lower().replace(' ','-')}", models=["qwen3.6-plus"], allowance={"kind": "credits", "monthlyCredits": weekly * WEEKS_PER_MONTH, "creditRatesPerM": {"qwen3.6-plus": {"fresh": 200, "cache": 20, "output": 1200}}}, source="https://help.aliyun.com/en/model-studio/token-plan-overview", confidence="derived", policy="interactive-only", note="Personal plan terms prohibit automated scripts and application backends.")
+
+# Raw-token plans. Regolo caps total raw tokens independent of model price.

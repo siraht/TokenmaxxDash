@@ -1,0 +1,37 @@
+                m[f"{mix_id}ApiUsdPerMPerIntelligencePoint"] = rate / model["intelligence"]
+        m["taskBenchmark"] = TASKS.get(model_id)
+        m["subscriptionRouteCount"] = sum(1 for r in rows + request_rows if r["modelId"] == model_id)
+        models.append(m)
+    models.sort(key=lambda m: (-(m.get("intelligence") or -1), m["name"]))
+
+    output = {
+        "asOf": AS_OF,
+        "purpose": "Compare every paid monthly coding subscription by route-billed model tokens, external intelligence/coding scores, and externally grounded task economics.",
+        "mixes": MIXES,
+        "exchangeRates": {"EURUSD": EUR_USD, "CNYUSD": 0.139},
+        "summary": {
+            "planCount": len(PLANS), "comparableRouteCount": len(rows), "requestRouteCount": len(request_rows),
+            "unquantifiedPlanCount": len(unquantified), "modelCount": len(models),
+            "ownedProviders": ["OpenAI Codex", "Grok Build", "Synthetic"],
+        },
+        "plans": PLANS,
+        "models": models,
+        "rows": rows,
+        "requestRows": request_rows,
+        "unquantifiedPlans": unquantified,
+        "frontiers": frontiers,
+        "shortlists": shortlists,
+        "shortlistDefinitions": SHORTLIST_DEFINITIONS,
+        "methodology": {
+            "primaryFormula": "subscription $/1M = monthly price / included blended raw-token millions",
+            "qualityFormula": "quality-adjusted $/1M = subscription $/1M / (Artificial Analysis Intelligence Index / 100)",
+            "taskFormula": "subscription $/successful external task = effective subscription $/M × published raw M tokens per task / published pass rate",
+            "warning": "Task rows preserve their external harness. They are plan-capacity counterfactuals, not claims that another harness will reproduce the same pass rate.",
+        },
+    }
+
+    text = json.dumps(output, indent=2, ensure_ascii=False, allow_nan=False) + "\n"
+    for path in (DATA / "buyer-guide.json", PUBLIC / "buyer-guide.json"):
+        path.write_text(text)
+    print(json.dumps(output["summary"], indent=2))
+

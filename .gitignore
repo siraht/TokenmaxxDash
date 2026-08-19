@@ -9,7 +9,7 @@ npm-debug.log*
 research/snapshots/
 __pycache__/
 *.py[cod]
-research/benchmark-candidates/*.raw.json
 src/data/
 public/data/
-.materialized-sources/
+preview/
+preview.png

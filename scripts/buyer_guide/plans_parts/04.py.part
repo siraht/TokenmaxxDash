@@ -1,0 +1,82 @@
+    add("Devin Desktop", name, price, id=f"devin-{name.lower()}", models=TOP_CATALOG, allowance={"kind": "hidden"}, source="https://docs.devin.ai/desktop/accounts/quota", confidence="official-partial", windows="daily/weekly quota", policy="interactive coding")
+for name, price in [("Pro", 20), ("Max", 100)]:
+    add("Ollama Cloud", name, price, id=f"ollama-{name.lower()}", models=OPEN_CATALOG, allowance={"kind": "hidden"}, source="https://ollama.com/pricing", confidence="official-partial", windows="model-dependent 5-hour and weekly limits", policy="interactive coding")
+for name, price in [("SuperGrok", 30), ("Heavy", 300)]:
+    add("Grok Build", name, price, id=f"grok-build-{name.lower()}", models=["grok-4.5"], allowance={"kind": "hidden"}, source="https://grok.com/", confidence="official-partial", owned=True, windows="shared weekly compute pool", policy="subscription coding")
+
+
+# Add every other currently cataloged paid individual monthly coding subscription
+# as a searchable plan record.  Long-tail products stay unranked until their model
+# pool or work-unit conversion is numerically defensible, but the Plans page now
+# covers the whole maintained market catalog rather than only the easy-to-price set.
+def _norm(value: str) -> str:
+    return "".join(ch for ch in value.lower() if ch.isalnum())
+
+_PROVIDER_ALIASES = {
+    "anthropicclaudecode": "claudecode",
+    "openaicodex": "openaicodex",
+    "stepfunstepplan": "stepfun",
+    "alibabacloudtokenplan": "alibabatokenplan",
+    "novitaaicoding": "novitacodingplan",
+    "xaigrokbuild": "grokbuild",
+    "cline": "clinepass",
+}
+_MODEL_ALIASES = {
+    _norm(model["name"]): model_id for model_id, model in MODELS.items()
+}
+_MODEL_ALIASES.update({
+    "gpt56sol": "gpt-5.6-sol", "gpt56terra": "gpt-5.6-terra", "gpt56luna": "gpt-5.6-luna",
+    "deepseekv4flash": "deepseek-v4-flash", "deepseekv4pro": "deepseek-v4-pro",
+    "mimov25": "mimo-v2.5", "mimov25pro": "mimo-v2.5-pro", "minimaxm3": "minimax-m3",
+    "kimik3": "kimi-k3", "kimik27code": "kimi-k2.7-code", "glm52": "glm-5.2", "glm53": "glm-5.3",
+})
+
+def _provider_key(value: str) -> str:
+    raw = _norm(value)
+    return _PROVIDER_ALIASES.get(raw, raw)
+
+_existing = {(_provider_key(plan["provider"]), _norm(plan["plan"])) for plan in PLANS}
+_normalized_providers = {_provider_key(plan["provider"]) for plan in PLANS}
+try:
+    broad_plans = json.loads((DATA / "plans.json").read_text())
+    broad_sources = {row["id"]: row for row in json.loads((DATA / "sources.json").read_text())}
+except (OSError, json.JSONDecodeError):
+    broad_plans, broad_sources = [], {}
+
+currency_to_usd = {"USD": 1.0, "EUR": EUR_USD, "CNY": 0.139, "BRL": 0.185}
+for item in broad_plans:
+    if item.get("status") != "active" or item.get("category") != "coding-subscription":
+        continue
+    price = item.get("priceMonthly")
+    currency = item.get("currency", "USD")
+    if price is None or price <= 0 or currency not in currency_to_usd:
+        continue
+    provider_key = _provider_key(item["provider"])
+    key = (provider_key, _norm(item["name"]))
+    # Explicit provider adapters are authoritative for every tier from that provider.
+    # This prevents stale broad-catalog snapshots from duplicating tiers already
+    # handled by an explicit provider adapter.
+    if provider_key in _normalized_providers or key in _existing:
+        continue
+    mapped_models = []
+    for label in item.get("models", []):
+        model_id = _MODEL_ALIASES.get(_norm(label))
+        if model_id and model_id not in mapped_models:
+            mapped_models.append(model_id)
+    source = None
+    for source_id in item.get("sourceIds", []):
+        if source_id in broad_sources:
+            source = broad_sources[source_id].get("url")
+            break
+    source = source or "https://github.com/siraht/TokenmaxxDash"
+    status = item.get("calculationStatus")
+    confidence = "secondary" if status == "secondary" else "official-partial"
+    add(
+        item["provider"], item["name"], price * currency_to_usd[currency],
+        id=f"catalog-{item['id']}", models=mapped_models,
+        allowance={"kind": "hidden", "catalogStatus": status}, source=source,
+        confidence=confidence, windows=item.get("headline"), policy=item.get("eligibility", "unknown"),
+        note="Imported from the broad monthly coding-subscription catalog. It remains unranked until the provider publishes a stable model-token or request conversion.",
+        currency=currency, originalPrice=price, supplemental=True,
+    )
+    _existing.add(key)

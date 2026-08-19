@@ -1,0 +1,31 @@
+for name, eur, tokens in [("Core", 39, 600_000_000), ("Boost", 89, 1_500_000_000), ("Pro", 169, 3_000_000_000), ("Scale", 319, 6_000_000_000)]:
+    add("Regolo", name, eur * EUR_USD, originalPrice=eur, currency="EUR", id=f"regolo-{name.lower()}", models=["glm-5.2", "gemma-4-31b", "qwen3.6-plus"], allowance={"kind": "rawTokens", "monthlyTokens": tokens}, windows=f"{tokens/30/1e6:.0f}M tokens/day", source="https://regolo.ai/pricing/", policy="API-compatible")
+
+# Measured subscription pools retained for comparison, but hidden by default when owned.
+for name, price, monthly_credits in [("Plus", 20, 11_653.0), ("Pro 5×", 100, 58_264.9), ("Pro 20×", 200, 233_059.5)]:
+    add("OpenAI Codex", name, price, id=f"codex-{name.lower().replace(' ','-').replace('×','x')}", models=["gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna"], allowance={"kind": "credits", "monthlyCredits": monthly_credits, "creditRatesPerM": {"gpt-5.6-sol": {"fresh": 125, "cache": 12.5, "output": 750}, "gpt-5.6-terra": {"fresh": 50, "cache": 5, "output": 300}, "gpt-5.6-luna": {"fresh": 5, "cache": 0.5, "output": 30}}}, source="https://help.openai.com/en/articles/20001106-codex-rate-card", confidence="measured", owned=True, windows="5-hour and weekly shared limits", policy="subscription coding")
+for name, price, low, center, high in [("Pro", 20, 523.51, 851.90, 1180.30), ("Max 5×", 100, 2617.57, 4259.53, 5901.49), ("Max 20×", 200, 10470.29, 17038.13, 23605.97)]:
+    add("Claude Code", name, price, id=f"claude-{name.lower().replace(' ','-').replace('×','x')}", models=["claude-opus-5", "claude-fable-5", "claude-sonnet-5", "claude-haiku-4.5"], allowance={"kind": "apiPoolRange", "monthlyUsdLow": low, "monthlyUsd": center, "monthlyUsdHigh": high}, source="https://github.com/anthropics/claude-code/issues/57699", confidence="measured-low", windows="rolling 5-hour and weekly shared limits", policy="subscription coding", note="Community-derived realized range, not an Anthropic-published token allowance. Fable is PAYG-only on Pro and capped within Max.")
+
+# Request/work-unit plans: useful, but they do not pretend one request equals a token count.
+for name, price, quota, rates in [
+    ("Lite", 12, 600, {"gpt-5.6-sol": 16, "gpt-5.6-terra": 8, "gpt-5.6-luna": 3.5, "deepseek-v4-flash": 0.21, "qwen3.5-omni-flash": 0.04}),
+    ("Pro", 25, 900, {"gpt-5.6-sol": 6, "gpt-5.6-terra": 3, "gpt-5.6-luna": 1.5, "deepseek-v4-flash": 0.15, "qwen3.5-omni-flash": 0.02}),
+    ("Plus", 60, 1500, {"gpt-5.6-sol": 5.5, "gpt-5.6-terra": 2.75, "gpt-5.6-luna": 1.25, "deepseek-v4-flash": 0.10, "qwen3.5-omni-flash": 0.02}),
+    ("Max", 200, 3000, {"gpt-5.6-sol": 5, "gpt-5.6-terra": 2.5, "gpt-5.6-luna": 1, "deepseek-v4-flash": 0.06, "qwen3.5-omni-flash": 0.01}),
+]:
+    add("Apertis", name, price, id=f"apertis-{name.lower()}", models=list(rates), allowance={"kind": "requests", "monthlyQuota": quota, "quotaPerRequest": rates}, source="https://apertis.ai/subscribe", policy="API-compatible", note="Cache hits are free and token length does not change quota deduction; compare by requests, not tokens.")
+
+# Estimated/opaque plans stay visible and can rank only on the fields they actually publish.
+for name, price, raw_b in [("Plus", 20, 1.7), ("Max", 50, 5.1), ("Ultra", 120, 12.5)]:
+    add("MiniMax Token Plan", name, price, id=f"minimax-{name.lower()}", models=["minimax-m3", "minimax-m2.7"], allowance={"kind": "rawTokensEstimate", "monthlyTokens": raw_b * 1e9}, source="https://platform.minimax.io/docs/token-plan/intro", confidence="secondary", windows="hidden 5-hour and weekly bars", policy="interactive coding", note="Raw-token estimate is secondary and workload-dependent; excluded by default from high-confidence ranking.")
+for name, price, relative, credits in [("Moderato", 19, 1, 60), ("Allegretto", 39, 5, 150), ("Allegro", 99, 15, 360), ("Vivace", 199, 30, 720)]:
+    add("Kimi Code", name, price, id=f"kimi-{name.lower()}", models=["kimi-k3", "kimi-k2.7-code", "kimi-k2.6"], allowance={"kind": "relative", "relativeToBase": relative, "agentCreditEquivalent": credits}, source="https://www.kimi.com/resources/kimi-k2-7-code-pricing", confidence="official-partial", windows="hidden 5-hour and weekly pool", policy="interactive coding", note="Relative tier capacity is published; absolute token pool is hidden, so no $/token rank.")
+add("ClinePass", "Pass", 9.99, id="clinepass", models=OPEN_CATALOG, allowance={"kind": "hidden", "claim": "2–5× standard API usage"}, source="https://cline.bot/cline-pass", confidence="official-partial", windows="hidden 5-hour, weekly, and monthly limits", policy="interactive coding")
+for name, price, tokens in [("Lite", 19.9, 50_000_000), ("Pro", 49.9, 150_000_000), ("Max", 199.9, 750_000_000)]:
+    add("Novita Coding Plan", name, price, id=f"novita-{name.lower()}", models=OPEN_CATALOG, allowance={"kind": "weightedPlanTokens", "monthlyPlanTokens": tokens}, source="https://novita.ai/coding-plan", confidence="official-partial", policy="coding tools", note="Model weights convert plan tokens at different rates; exact per-model multipliers must be attached before $/raw-token ranking.")
+for name, price, credits in [("Pro", 20, 1000), ("Pro+", 40, 2000), ("Pro Max", 100, 5000), ("Power", 200, 10_000)]:
+    add("Kiro", name, price, id=f"kiro-{name.lower().replace(' ','-').replace('+','plus')}", models=TOP_CATALOG, allowance={"kind": "workUnits", "monthlyCredits": credits, "overageUsdPerCredit": 0.04}, source="https://kiro.dev/pricing/", confidence="official-partial", policy="interactive coding", note="Credits are complexity-dependent work units, not token credits.")
+for name, price in [("Pro", 20), ("Plus", 100), ("Max", 200)]:
+    add("Factory", name, price, id=f"factory-{name.lower()}", models=TOP_CATALOG, allowance={"kind": "hidden"}, source="https://docs.factory.ai/pricing/individuals", confidence="official-partial", windows="5-hour, 7-day, and 30-day windows", policy="interactive coding")
+for name, price in [("Pro", 20), ("Max", 200)]:
