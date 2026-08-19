@@ -21,19 +21,51 @@ Claude Code, OpenAI Codex, Grok Build, Synthetic, and every alternative remain v
 
 Every monthly plan is assigned one comparison class:
 
-- **Token:** a defensible model-specific token denominator exists.
+- **Token:** an exact, measured-range, or measured-lower-bound token denominator exists.
 - **Request:** request counts and weights exist, but tokens per request do not.
-- **Managed:** the product sells agent tasks, app-builder tokens, platform credits, work units, or fair-use throughput.
+- **Managed:** the product sells agent tasks, app-builder tokens, platform credits, work units, energy, or fair-use throughput.
 - **Relative:** the provider publishes a tier multiplier without an absolute base pool or complete model weights.
-- **Provider-hidden:** the plan exists, but the provider withholds the allowance or deduction formula required for a numerical comparison.
+- **Calibratable:** the provider’s own usage API and local logs expose a reproducible way to recover the account’s denominator, but no plan-labeled public sample identifies a universal tier value yet.
+- **Provider-hidden:** the plan exists, but the provider withholds the allowance or deduction fields required for a numerical comparison and no defensible external measurement closes the gap.
 
 A provider-hidden record is a completed research result, not a zero. The plan stays visible with the exact missing fields and cannot enter only the rankings that require those fields.
 
-The catalog includes native-unit adapters for transparent token gateways, weighted token plans, request plans, IDE credits, managed coding agents, app builders, and fair-use passes. Long-tail catalog records with published raw tokens, weighted plan tokens, request windows, daily tasks, platform credits, or concurrency limits retain those native quantities even when they cannot be reduced to model tokens.
+Range-based plans are ranked with their **conservative lower capacity bound**. Midpoint and upper estimates remain visible on the plan page and in the generated JSON.
+
+The catalog includes native-unit adapters for transparent token gateways, weighted token plans, request plans, IDE credits, managed coding agents, app builders, fair-use passes, Standard-token pools, API-value ranges, lower-bound measurements, and authenticated usage-meter calibration.
+
+## Deep quota inference
+
+Tokenmaxx no longer stops at provider marketing pages. It also inspects:
+
+- authenticated usage endpoints and billing-response schemas;
+- local JSONL token records and transaction histories;
+- plan-labeled meter deltas;
+- independently maintained quota clients;
+- official relative tier relationships;
+- quantified user reports whose plan, model, time window, and reset state are identifiable.
+
+This has produced useful current records for:
+
+- Cursor’s exact $20/$70/$400 Other Models pools;
+- current Claude Code raw-token and API-equivalent ranges;
+- Kimi Allegretto’s measured 1.37–1.50B monthly raw-token range and official tier scaling;
+- Factory’s reconstructed 20M/100M/200M Standard-token pools and model multipliers;
+- Ollama Pro and Max measured raw-token lower bounds;
+- Google Antigravity post-boost mixed-route ranges;
+- BytePlus Lite and Pro request ceilings;
+- ClinePass’s 2–5× API-value range and authenticated calibration path;
+- Grok Build’s billing/local-log calibration formula;
+- Devin’s managed message-equivalent ranges;
+- Tabnine’s BYOK, hosted-model surcharge, and Headless processing-token economics.
+
+See [Hidden-quota inference](docs/QUOTA_INFERENCE.md) for formulas, source chains, evidence levels, and remaining measurement targets.
 
 ## Claude and Fable
 
-Anthropic does not publish absolute Claude Code subscription buckets. Claude Pro, Max 5×, and Max 20× therefore use measured ranges rather than invented exact quotas. Fable 5 is PAYG-only on Pro; Max includes it but caps it at 50% of the shared weekly meter. Because Anthropic does not publish Fable’s meter multiplier, Tokenmaxx applies the access rule and share cap without fabricating a raw-token ceiling.
+Anthropic does not publish absolute Claude Code subscription buckets. Claude Pro, Max 5×, and Max 20× therefore use current measured ranges rather than invented exact quotas. Older, substantially more generous accounting regimes remain historical evidence and are excluded from current rankings.
+
+Fable 5 is PAYG-only on Pro; Max includes it but caps it at 50% of the shared weekly meter. Because Anthropic does not publish Fable’s meter multiplier, Tokenmaxx applies the access rule and share cap without fabricating a raw-token ceiling.
 
 ## External benchmarks only
 
@@ -81,20 +113,26 @@ scripts/build_buyer_guide.py
   → provider-specific plan/model calculations
   → verified enrichment adapters
   → long-tail native-unit promotion
-  → access corrections
-  → universal and alternative-only rankings
+  → deep hidden-quota inference
+  → model-access corrections
+  → conservative range ranking
+  → universal and alternative-only frontiers
   → src/data/buyer-guide.json
   → public/data/buyer-guide.json
 ```
 
 Important modules:
 
-- `scripts/buyer_guide/models.py` — canonical model rates, intelligence, and aliases.
+- `scripts/buyer_guide/models.py` — canonical model rates, intelligence, aliases, and task evidence.
 - `scripts/buyer_guide/plans.py` — plan definitions and enrichment orchestration.
 - `scripts/buyer_guide/enrichment.py` — verified provider adapters and explicit missing fields.
 - `scripts/buyer_guide/native_units.py` — raw-token, request, work-unit, and fair-use normalization.
-- `scripts/buyer_guide/finalize.py` — access constraints, rankings, shortlists, and audit records.
-- `scripts/validate_buyer_guide.py` — data invariants.
+- `scripts/buyer_guide/inferred_subscriptions.py` — Cursor, Claude, Kimi, Factory, Ollama, Antigravity, BytePlus, Grok, ClinePass, Devin, and Tabnine inference.
+- `scripts/buyer_guide/capacity_extensions.py` — range, lower-bound, and Standard-token calculations.
+- `scripts/buyer_guide/conservative_metrics.py` — conservative default economics and frontiers.
+- `scripts/buyer_guide/finalize.py` — access constraints and initial plan-route joins.
+- `scripts/buyer_guide/postprocess.py` — conservative rankings and audit metadata.
+- `scripts/validate_inferred_subscriptions.py` — deep-inference invariants.
 - `scripts/check_sources.py` — Astro source and workflow checks.
 
 ## GitHub Actions
