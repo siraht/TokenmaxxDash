@@ -7,6 +7,8 @@ exec(compile(_source, str(_parts), "exec"), globals())
 
 from .enrichment import apply_enrichment
 from .native_units import apply_native_units
+from .corrections import apply_corrections
 
 apply_enrichment(PLANS, MODELS, TOP_CATALOG, OPEN_CATALOG, DATA)
 apply_native_units(PLANS, MODELS, DATA)
+apply_corrections(PLANS, MODELS)
