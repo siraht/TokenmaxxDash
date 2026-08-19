@@ -1,50 +1,45 @@
 # TokenmaxxDash
 
-Tokenmaxx is an evidence-backed Astro dashboard for comparing AI coding subscriptions by the things that produce useful work: **external model intelligence**, **native coding-agent performance**, **API cost per benchmark task**, **subscription cost per expected benchmark-equivalent pass**, sustained allowance, latency, model access, policy eligibility, and evidence confidence.
+Tokenmaxx answers one practical question:
 
-Raw tokens and advertised credit multiples remain available, but they are deliberately not the default ranking. A huge pool of a weak model cannot displace a smaller pool of a substantially stronger model merely because the token count is larger.
+> **Which monthly AI coding subscription buys the most useful model capacity for the money?**
 
-## Current snapshot
+The primary comparison unit is a **subscription × model route**. For every route with enough evidence, the dashboard calculates:
 
-As of **18 August 2026**, the generated dataset contains:
+- model-specific included monthly value or token allowance;
+- effective raw tokens per month under selectable token mixes;
+- subscription dollars per million raw tokens;
+- external model intelligence and coding-task performance;
+- quality-adjusted subscription dollars per million tokens;
+- external API cost per benchmark task and per expected success;
+- subscription cost per benchmark-equivalent successful task;
+- five-hour, weekly, monthly, concurrency, access, and policy constraints.
 
-- **219 subscription tiers** across **69 providers or product families**.
-- **77 advertised model labels**, each with a direct external match or an explicit exclusion reason.
-- **83 external benchmark rows** from publisher-owned model and coding-agent sources, including CursorBench 3.2.
-- **293 plan/model access routes** with route version, access mode, transfer confidence, quality band, and plan evidence.
-- **68 native subscription-task estimates** where an exact externally tested agent/model route can be joined to a defensible plan denominator.
-- **Claude Fable 5** as a first-class model, Claude Code agent route, Terminal-Bench route, four CursorBench effort levels, and Max-plan access route.
-- **Claude Code Pro, Max 5×, and Max 20×** measured raw-token ranges, API-equivalent ranges, and per-model/per-token-category subscription-cost estimates.
-- Separate Pareto fronts for budget, passing-work throughput, API cost per expected pass, model price per intelligence point, speed, evidence-adjusted capacity, access price, and raw subsidy.
+Claude Code, OpenAI Codex, Grok Build, Synthetic, and every alternative remain visible by default. “Already owned” is optional personal metadata and can be hidden with a filter; it never changes the public ranking logic.
 
-The dashboard imports Artificial Analysis model and Coding Agent Index results, Terminal-Bench 2.1, and CursorBench 3.2. It uses **external benchmarks only**. It does not currently run a private benchmark suite, simulate user workloads, or collect community telemetry. The repository includes a future community contribution schema and local JSON builder, but submitted results are not yet ingested.
+## Missing data is explicit
 
-## What changed from the allowance-only version
+Every monthly plan is assigned one comparison class:
 
-The default comparison now requires a direct external model-intelligence score of **60 or higher**. Subscription task fronts additionally require a native external coding-agent result and a directly matched included plan route.
+- **Token:** a defensible model-specific token denominator exists.
+- **Request:** request counts and weights exist, but tokens per request do not.
+- **Managed:** the product sells agent tasks, app-builder tokens, platform credits, work units, or fair-use throughput.
+- **Relative:** the provider publishes a tier multiplier without an absolute base pool or complete model weights.
+- **Provider-hidden:** the plan exists, but the provider withholds the allowance or deduction formula required for a numerical comparison.
 
-This changes the market picture:
+A provider-hidden record is a completed research result, not a zero. The plan stays visible with the exact missing fields and cannot enter only the rankings that require those fields.
 
-- **Claude Code and Codex both appear on quality-gated subscription fronts**.
-- **Fable 5 remains visible even when Opus or Sol dominates it on a particular Pareto axis**.
-- **StepFun remains a raw-subsidy leader**, but it no longer controls the default recommendation surface when its model score falls below the quality floor.
-- Provider-specific Pareto fronts show the best configurations inside each native coding product, so one globally dominant vendor does not erase every alternative.
+The catalog includes native-unit adapters for transparent token gateways, weighted token plans, request plans, IDE credits, managed coding agents, app builders, and fair-use passes. Long-tail catalog records with published raw tokens, weighted plan tokens, request windows, daily tasks, platform credits, or concurrency limits retain those native quantities even when they cannot be reduced to model tokens.
 
-## Claude Code inference
+## Claude and Fable
 
-Anthropic does not publish absolute subscription token pools, so Tokenmaxx stores two measured denominators rather than inventing an official quota:
+Anthropic does not publish absolute Claude Code subscription buckets. Claude Pro, Max 5×, and Max 20× therefore use measured ranges rather than invented exact quotas. Fable 5 is PAYG-only on Pro; Max includes it but caps it at 50% of the shared weekly meter. Because Anthropic does not publish Fable’s meter multiplier, Tokenmaxx applies the access rule and share cap without fabricating a raw-token ceiling.
 
-| Plan | Estimated mixed raw tokens/week | Average mixed raw tokens/month | Full-utilization subscription cost per 1M raw tokens |
-|---|---:|---:|---:|
-| Pro | 0.20–0.28B | 0.87–1.22B | $0.01643–$0.02300 |
-| Max 5× | 1.00–1.40B | 4.35–6.09B | $0.01643–$0.02300 |
-| Max 20× | 4.00–5.60B | 17.39–24.35B | $0.00821–$0.01150 |
+## External benchmarks only
 
-Each Claude plan page also calculates pure-category counterfactuals for Opus 5, Fable 5, Sonnet 5, and Haiku 4.5 across fresh input, cache reads, five-minute cache writes, one-hour cache writes, and output. These use the measured API-equivalent plan range and current public API rates.
+Tokenmaxx imports externally published model and coding-agent results. It does not currently run a private benchmark suite or collect user telemetry. A benchmark result remains attached to the exact model, harness, version, effort, cost denominator, and source that produced it.
 
-Fable 5 is **PAYG-only on Pro**. It is included on Max but limited to **50% of the shared weekly meter** and consumes the meter faster; because Anthropic does not publish that multiplier, Tokenmaxx does not fabricate a raw Fable token allowance.
-
-See [Claude Code inference](docs/CLAUDE_INFERENCE.md) for the formulas, measurements, caveats, and update rules.
+The repository includes a future community-submission schema, but community results remain separate from publisher-owned results until review.
 
 ## Run locally
 
@@ -54,21 +49,17 @@ Astro 7 requires Node.js 22.12 or newer.
 nvm use
 npm install --no-audit --no-fund
 npm run refresh:data
-npm run check:data
+npm run verify
 npm run dev
 ```
 
-Build the static Astro site:
+Build the static site:
 
 ```bash
 npm run build
 ```
 
-The output is written to `dist/`.
-
-## Publish on Cloudflare Pages
-
-Create a Cloudflare Pages project from this repository with:
+Cloudflare Pages settings:
 
 ```text
 Framework preset: Astro
@@ -78,74 +69,38 @@ Root directory: /
 Node version: 22.12.0 or newer
 ```
 
-The project is fully static, so no Cloudflare adapter is required. `wrangler.jsonc` and `public/_headers` are included for manual direct deployment.
-
-**GitHub Actions is intentionally disabled.** There are no executable workflow files under `.github/workflows`, and this repository must remain that way until automation is explicitly enabled later. Current refresh and deployment commands are manual.
+The application is static; no Cloudflare adapter is required.
 
 ## Data pipeline
 
-The canonical evidence and calculation logic live in `scripts/build_data.py`, `scripts/complete_data.py`, and `scripts/augment_external_benchmarks.py`. `npm run prepare:data` deterministically regenerates the gitignored `src/data/` build inputs and mirrors them into gitignored `public/data/` JSON endpoints before local development or production builds:
-
 ```text
-plans.json
-models.json
-benchmarks.json
-quality-routes.json
-subscription-task-estimates.json
-leaders.json
-sources.json
-summary.json
-methodology.json
-candidates.json
+scripts/build_data.py
+  → broad market catalog and source records
+
+scripts/build_buyer_guide.py
+  → provider-specific plan/model calculations
+  → verified enrichment adapters
+  → long-tail native-unit promotion
+  → access corrections
+  → universal and alternative-only rankings
+  → src/data/buyer-guide.json
+  → public/data/buyer-guide.json
 ```
 
-Regenerate them with:
+Important modules:
 
-```bash
-npm run refresh:data
-python3 scripts/build_coverage.py
-npm run check:data
-```
+- `scripts/buyer_guide/models.py` — canonical model rates, intelligence, and aliases.
+- `scripts/buyer_guide/plans.py` — plan definitions and enrichment orchestration.
+- `scripts/buyer_guide/enrichment.py` — verified provider adapters and explicit missing fields.
+- `scripts/buyer_guide/native_units.py` — raw-token, request, work-unit, and fair-use normalization.
+- `scripts/buyer_guide/finalize.py` — access constraints, rankings, shortlists, and audit records.
+- `scripts/validate_buyer_guide.py` — data invariants.
+- `scripts/check_sources.py` — Astro source and workflow checks.
 
-The pipeline is split into three stages:
+## GitHub Actions
 
-1. `scripts/build_data.py` creates the broad plan catalog and provider-specific base calculations.
-2. `scripts/complete_data.py` adds current external model and agent evidence, Claude inference, exact route semantics, task economics, confidence adjustments, and Pareto fronts.
-3. `scripts/augment_external_benchmarks.py` imports publisher-owned benchmark tables whose cadence is independent of plan normalization, currently CursorBench 3.2.
-
-## Validation
-
-```bash
-npm run verify
-```
-
-The validators check cross-file IDs, source provenance, status semantics, model-route completeness, benchmark-derived metrics, task-estimate ranges, Fable access behavior, all three Claude plan estimates, every CursorBench cost/pass calculation, public-data mirrors, and the absence of active GitHub Actions workflows.
-
-## Evidence refresh
-
-The source registry can be checked without mutating published data:
-
-```bash
-python3 scripts/watch_sources.py --validate-only
-```
-
-A manual source refresh can fingerprint and snapshot monitored pages:
-
-```bash
-python3 scripts/watch_sources.py --write-state --save-snapshots
-```
-
-Detected changes create review inputs only. They do not silently rewrite plan values, model matches, or benchmark scores.
-
-## Methodology and contribution design
-
-- [Data model](docs/DATA_MODEL.md)
-- [Claude Code inference](docs/CLAUDE_INFERENCE.md)
-- [Pareto methodology](docs/PARETO_METHODOLOGY.md)
-- [Plan coverage](docs/PLAN_COVERAGE.md)
-- [Research findings](docs/RESEARCH_FINDINGS.md)
-- [Future community benchmark contributions](docs/COMMUNITY_BENCHMARKS.md)
+GitHub Actions is intentionally disabled. There are no executable workflow files under `.github/workflows/`. Refresh, validation, build, and deployment commands remain manual until automation is explicitly enabled.
 
 ## License
 
-MIT. Source-page content and benchmark values remain subject to their publishers’ terms and licenses.
+MIT. Source-page content and external benchmark values remain subject to their publishers’ terms and licenses.

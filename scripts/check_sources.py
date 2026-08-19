@@ -9,7 +9,6 @@ ROOT = Path(__file__).resolve().parents[1]
 errors: list[str] = []
 astro_files = sorted((ROOT / "src").rglob("*.astro"))
 import_re = re.compile(r"^import\s+.+?\s+from\s+['\"]([^'\"]+)['\"];?\s*$", re.MULTILINE)
-
 for path in astro_files:
     text = path.read_text(encoding="utf-8")
     if not text.startswith("---\n") or "\n---\n" not in text[4:]:
@@ -26,33 +25,23 @@ for path in astro_files:
         if not any(candidate.exists() for candidate in candidates):
             errors.append(f"{path.relative_to(ROOT)}: missing import {specifier}")
 
-required = [
-    "src/pages/index.astro",
-    "src/pages/plans/index.astro",
-    "src/pages/plans/[id].astro",
-    "src/pages/models.astro",
-    "src/pages/benchmarks.astro",
-    "src/pages/leaders.astro",
-    "src/pages/methodology.astro",
-]
-for relative in required:
+for relative in (
+    "src/pages/index.astro", "src/pages/plans/index.astro", "src/pages/plans/[id].astro",
+    "src/pages/models.astro", "src/pages/benchmarks.astro", "src/pages/methodology.astro",
+):
     if not (ROOT / relative).exists():
         errors.append(f"missing required page: {relative}")
-
 index = (ROOT / "src/pages/index.astro").read_text(encoding="utf-8")
-for phrase in ("Route billed $ / 1M", "Coding score", "Include owned plans"):
+for phrase in ("Subscription $/M", "Quality-adjusted $/M", "Hide plans I already own", "Claude, Codex, Grok, and Synthetic"):
     if phrase not in index:
-        errors.append(f"homepage missing primary buying field: {phrase}")
-
-for stale in ("Codex vs Claude", "No arbitrary master score", "quality-gated Pareto"):
+        errors.append(f"homepage missing core comparison field: {phrase}")
+for stale in ("Default view excludes", "Include owned plans", "Codex vs Claude"):
     for path in (ROOT / "src").rglob("*"):
         if path.is_file() and stale.lower() in path.read_text(encoding="utf-8", errors="ignore").lower():
-            errors.append(f"{path.relative_to(ROOT)}: stale comparison framing {stale!r}")
-
-workflow_dir = ROOT / ".github" / "workflows"
+            errors.append(f"{path.relative_to(ROOT)}: stale framing {stale!r}")
+workflow_dir = ROOT / ".github/workflows"
 if workflow_dir.exists() and any(path.suffix.lower() in {".yml", ".yaml"} for path in workflow_dir.iterdir()):
     errors.append("active GitHub Actions workflow found")
-
 if errors:
     raise SystemExit("\n".join(errors))
-print(f"Checked {len(astro_files)} Astro files, imports, core buying fields, stale framing, and zero active Actions workflows.")
+print(f"Checked {len(astro_files)} Astro files, imports, universal comparison fields, stale owned-plan framing, and zero active Actions workflows.")
