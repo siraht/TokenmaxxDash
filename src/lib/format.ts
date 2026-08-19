@@ -1,34 +1,26 @@
-export function formatNumber(value: unknown, maximumFractionDigits = 2): string {
-  if (typeof value !== 'number') return String(value ?? '—');
+export function number(value: unknown, maximumFractionDigits = 2): string {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return '—';
   return new Intl.NumberFormat('en-US', { maximumFractionDigits }).format(value);
 }
 
-export function titleCaseKey(value: string): string {
-  return value
-    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
-    .replace(/Usd/g, 'USD')
-    .replace(/Api/g, 'API')
-    .replace(/Mcp/g, 'MCP')
-    .replace(/^./, (char) => char.toUpperCase());
+export function money(value: unknown, digits = 3): string {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return '—';
+  if (value < 0.01) return `$${value.toFixed(5)}`;
+  if (value < 1) return `$${value.toFixed(digits)}`;
+  return `$${value.toFixed(2)}`;
 }
 
-export function valueText(plan: any): string {
-  return plan.valueDisplay || 'Provider-hidden numerical pool';
+export function planLabel(plan: any): string {
+  return `${plan.provider} ${plan.plan}`;
 }
 
-export function statusLabel(value: string): string {
+export function confidenceLabel(value: string): string {
   return ({
-    exact: 'Official exact',
-    derived: 'Evidence-derived',
-    'measured-range': 'Measured range',
-    partial: 'Partially normalized',
-    'provider-hidden': 'Provider-hidden',
-    secondary: 'Secondary-source',
-    'unverified-candidate': 'Unverified candidate',
-    legacy: 'Legacy'
+    official: 'Official',
+    measured: 'Measured',
+    'measured-low': 'Measured · low confidence',
+    secondary: 'Secondary estimate',
+    derived: 'Derived',
+    'official-partial': 'Official · incomplete'
   } as Record<string, string>)[value] || value;
-}
-
-export function sourceMap(sources: any[]): Map<string, any> {
-  return new Map(sources.map((source) => [source.id, source]));
 }

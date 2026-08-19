@@ -1,100 +1,127 @@
 (() => {
-  const planTable = document.querySelector('[data-plan-table]');
-  if (planTable) {
-    const rows = [...planTable.querySelectorAll('tbody tr[data-plan-row]')];
-    const search = document.querySelector('[data-filter-search]');
-    const status = document.querySelector('[data-filter-status]');
-    const provider = document.querySelector('[data-filter-provider]');
-    const sort = document.querySelector('[data-sort-plans]');
-    const count = document.querySelector('[data-results-count]');
-    const empty = document.querySelector('[data-empty-state]');
+  const buyerTable = document.querySelector('[data-buyer-table]');
+  if (buyerTable) {
+    const rows = [...buyerTable.querySelectorAll('[data-buyer-row]')];
+    const search = document.querySelector('[data-buyer-search]');
+    const mix = document.querySelector('[data-buyer-mix]');
+    const quality = document.querySelector('[data-buyer-quality]');
+    const budget = document.querySelector('[data-buyer-budget]');
+    const evidence = document.querySelector('[data-buyer-evidence]');
+    const sort = document.querySelector('[data-buyer-sort]');
+    const owned = document.querySelector('[data-buyer-owned]');
+    const count = document.querySelector('[data-buyer-count]');
+    const empty = document.querySelector('[data-buyer-empty]');
+    const body = buyerTable.querySelector('tbody');
 
-    const apply = () => {
+    const metric = (row, key, mixId, fallback = 999999) => {
+      const value = Number(row.dataset[`${mixId}${key}`]);
+      return Number.isFinite(value) ? value : fallback;
+    };
+
+    const updateVisibleMetricText = (row, mixId) => {
+      row.querySelectorAll('[data-metric-standard]').forEach((element) => {
+        element.textContent = element.getAttribute(`data-metric-${mixId}`) || '—';
+      });
+    };
+
+    const applyBuyer = () => {
       const query = (search?.value || '').trim().toLowerCase();
-      const statusValue = status?.value || 'all';
-      const providerValue = provider?.value || 'all';
+      const mixId = mix?.value || 'standard';
+      const minimumQuality = Number(quality?.value || 0);
+      const maximumPrice = Number(budget?.value || 10000);
+      const evidenceMode = evidence?.value || 'primary';
+      const includeOwned = Boolean(owned?.checked);
+      const sortBy = sort?.value || 'quality-cost';
+
       const visible = rows.filter((row) => {
-        const matchesQuery = !query || row.dataset.search?.includes(query);
-        const matchesStatus = statusValue === 'all' || row.dataset.status === statusValue;
-        const matchesProvider = providerValue === 'all' || row.dataset.provider === providerValue;
-        return matchesQuery && matchesStatus && matchesProvider;
+        const matchesSearch = !query || row.dataset.search?.includes(query);
+        const matchesQuality = Number(row.dataset.intelligence || -1) >= minimumQuality;
+        const matchesPrice = Number(row.dataset.price || 999999) <= maximumPrice;
+        const matchesOwned = includeOwned || row.dataset.owned !== 'true';
+        const confidence = row.dataset.confidence || '';
+        const primary = ['official', 'derived', 'official-partial', 'measured'].includes(confidence);
+        const matchesEvidence = evidenceMode === 'all' || (evidenceMode === 'official' ? confidence === 'official' : primary);
+        return matchesSearch && matchesQuality && matchesPrice && matchesOwned && matchesEvidence;
       });
 
-      const sortValue = sort?.value || 'value-desc';
       visible.sort((a, b) => {
-        const av = Number(a.dataset.value || '-1');
-        const bv = Number(b.dataset.value || '-1');
-        const ap = Number(a.dataset.price || '999999');
-        const bp = Number(b.dataset.price || '999999');
-        if (sortValue === 'price-asc') return ap - bp;
-        if (sortValue === 'price-desc') return bp - ap;
-        if (sortValue === 'provider') return (a.dataset.provider || '').localeCompare(b.dataset.provider || '');
-        return bv - av;
+        if (sortBy === 'intelligence') return Number(b.dataset.intelligence || -1) - Number(a.dataset.intelligence || -1);
+        if (sortBy === 'coding') return Number(b.dataset.coding || -1) - Number(a.dataset.coding || -1);
+        if (sortBy === 'route-rate') return metric(a, 'Rate', mixId) - metric(b, 'Rate', mixId);
+        if (sortBy === 'tokens') return metric(b, 'Tokens', mixId, -1) - metric(a, 'Tokens', mixId, -1);
+        if (sortBy === 'token-cost') return metric(a, 'Cost', mixId) - metric(b, 'Cost', mixId);
+        if (sortBy === 'task-cost') return metric(a, 'TaskCost', mixId) - metric(b, 'TaskCost', mixId);
+        if (sortBy === 'price') return Number(a.dataset.price || 999999) - Number(b.dataset.price || 999999);
+        return metric(a, 'QualityCost', mixId) - metric(b, 'QualityCost', mixId);
       });
 
       rows.forEach((row) => { row.hidden = true; });
-      const body = planTable.querySelector('tbody');
-      visible.forEach((row) => { row.hidden = false; body?.appendChild(row); });
-      if (count) count.textContent = `${visible.length} of ${rows.length} plan tiers`;
+      visible.forEach((row, index) => {
+        row.hidden = false;
+        updateVisibleMetricText(row, mixId);
+        const rank = row.querySelector('[data-row-rank]');
+        if (rank) rank.textContent = String(index + 1);
+        body?.appendChild(row);
+      });
+
+      if (count) count.textContent = `${visible.length} of ${rows.length} comparable subscription/model routes`;
       empty?.classList.toggle('is-visible', visible.length === 0);
     };
-    [search, status, provider, sort].forEach((control) => control?.addEventListener('input', apply));
-    apply();
+
+    [search, mix, quality, budget, evidence, sort, owned].forEach((control) => {
+      control?.addEventListener('input', applyBuyer);
+      control?.addEventListener('change', applyBuyer);
+    });
+    applyBuyer();
   }
 
-  const benchmarkTable = document.querySelector('[data-benchmark-table]');
-  if (benchmarkTable) {
-    const rows = [...benchmarkTable.querySelectorAll('tbody tr[data-benchmark-row]')];
-    const query = document.querySelector('[data-benchmark-search]');
-    const agent = document.querySelector('[data-benchmark-agent]');
-    const apply = () => {
-      const q = (query?.value || '').trim().toLowerCase();
-      const a = agent?.value || 'all';
-      rows.forEach((row) => {
-        row.hidden = !((!q || row.dataset.search?.includes(q)) && (a === 'all' || row.dataset.agent === a));
-      });
-    };
-    [query, agent].forEach((control) => control?.addEventListener('input', apply));
-    apply();
-  }
+  const planGrid = document.querySelector('[data-plan-grid]');
+  if (planGrid) {
+    const cards = [...planGrid.querySelectorAll('[data-plan-card]')];
+    const search = document.querySelector('[data-plan-search]');
+    const provider = document.querySelector('[data-plan-provider]');
+    const evidence = document.querySelector('[data-plan-evidence]');
+    const quantified = document.querySelector('[data-plan-quantified]');
+    const sort = document.querySelector('[data-plan-sort]');
+    const count = document.querySelector('[data-plan-count]');
+    const empty = document.querySelector('[data-plan-empty]');
 
-  const modelTable = document.querySelector('[data-model-table]');
-  if (modelTable) {
-    const rows = [...modelTable.querySelectorAll('tbody tr[data-model-row]')];
-    const search = document.querySelector('[data-model-search]');
-    const coverage = document.querySelector('[data-model-coverage]');
-    const provider = document.querySelector('[data-model-provider]');
-    const sort = document.querySelector('[data-model-sort]');
-    const count = document.querySelector('[data-model-results-count]');
-    const empty = document.querySelector('[data-model-empty]');
-
-    const apply = () => {
-      const q = (search?.value || '').trim().toLowerCase();
-      const coverageValue = coverage?.value || 'all';
+    const applyPlans = () => {
+      const query = (search?.value || '').trim().toLowerCase();
       const providerValue = provider?.value || 'all';
-      const visible = rows.filter((row) => {
-        const coverageMatch = coverageValue === 'all'
-          || (coverageValue === 'ranked' && row.dataset.ranked === 'true')
-          || row.dataset.coverage === coverageValue;
-        const providerMatch = providerValue === 'all' || (row.dataset.providers || '').split('|').includes(providerValue);
-        return (!q || row.dataset.search?.includes(q)) && coverageMatch && providerMatch;
+      const evidenceValue = evidence?.value || 'all';
+      const quantifiedValue = quantified?.value || 'all';
+      const sortValue = sort?.value || 'provider';
+      const primary = new Set(['official', 'derived', 'official-partial', 'measured']);
+
+      const visible = cards.filter((card) => {
+        const confidence = card.dataset.confidence || '';
+        const evidenceMatch = evidenceValue === 'all'
+          || (evidenceValue === 'official' && confidence === 'official')
+          || (evidenceValue === 'primary' && primary.has(confidence))
+          || (evidenceValue === 'secondary' && !primary.has(confidence));
+        return (!query || card.dataset.search?.includes(query))
+          && (providerValue === 'all' || card.dataset.provider === providerValue)
+          && (quantifiedValue === 'all' || card.dataset.quantified === quantifiedValue)
+          && evidenceMatch;
       });
 
-      const sortValue = sort?.value || 'intelligence-desc';
       visible.sort((a, b) => {
-        if (sortValue === 'price-density') return Number(a.dataset.density || 999999) - Number(b.dataset.density || 999999);
-        if (sortValue === 'speed-desc') return Number(b.dataset.speed || -1) - Number(a.dataset.speed || -1);
-        if (sortValue === 'name') return (a.dataset.name || '').localeCompare(b.dataset.name || '');
-        return Number(b.dataset.intelligence || -1) - Number(a.dataset.intelligence || -1);
+        if (sortValue === 'price') return Number(a.dataset.price) - Number(b.dataset.price);
+        if (sortValue === 'quality-cost') return Number(a.dataset.qualityCost) - Number(b.dataset.qualityCost);
+        return (a.dataset.provider || '').localeCompare(b.dataset.provider || '') || Number(a.dataset.price) - Number(b.dataset.price);
       });
 
-      rows.forEach((row) => { row.hidden = true; });
-      const body = modelTable.querySelector('tbody');
-      visible.forEach((row) => { row.hidden = false; body?.appendChild(row); });
-      if (count) count.textContent = `${visible.length} of ${rows.length} model labels`;
+      cards.forEach((card) => { card.hidden = true; });
+      visible.forEach((card) => { card.hidden = false; planGrid.appendChild(card); });
+      if (count) count.textContent = `${visible.length} of ${cards.length} plans`;
       empty?.classList.toggle('is-visible', visible.length === 0);
     };
-    [search, coverage, provider, sort].forEach((control) => control?.addEventListener('input', apply));
-    apply();
+
+    [search, provider, evidence, quantified, sort].forEach((control) => {
+      control?.addEventListener('input', applyPlans);
+      control?.addEventListener('change', applyPlans);
+    });
+    applyPlans();
   }
 })();

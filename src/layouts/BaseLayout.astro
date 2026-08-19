@@ -1,7 +1,6 @@
 ---
 import Nav from '../components/Nav.astro';
 import '../styles/global.css';
-import '../styles/quality.css';
 
 interface Props {
   title: string;
@@ -11,7 +10,7 @@ interface Props {
 
 const {
   title,
-  description = 'Evidence-backed comparisons of AI coding subscriptions, model quality, external coding-agent benchmarks, and quality-adjusted Pareto economics.',
+  description = 'Compare monthly AI coding subscriptions by effective tokens, external model intelligence, and cost per successful benchmark task.',
   canonical
 } = Astro.props;
 const pageTitle = title === 'Tokenmaxx' ? title : `${title} · Tokenmaxx`;
@@ -23,7 +22,7 @@ const canonicalUrl = canonical || new URL(Astro.url.pathname, Astro.site || Astr
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width" />
     <meta name="description" content={description} />
-    <meta name="theme-color" content="#0a0e13" />
+    <meta name="theme-color" content="#0b0d10" />
     <link rel="canonical" href={canonicalUrl} />
     <title>{pageTitle}</title>
   </head>
@@ -32,13 +31,11 @@ const canonicalUrl = canonical || new URL(Astro.url.pathname, Astro.site || Astr
       <Nav />
       <main><slot /></main>
       <footer class="site-footer">
-        <p>Evidence snapshot: 18 August 2026. External benchmarks only; hidden quotas remain ranges or explicit unknowns.</p>
+        <p>Snapshot: 18 August 2026. Default view excludes the owner’s Codex, Grok, and Synthetic subscriptions.</p>
         <div>
-          <a href="/data/plans.json">Plans JSON</a>
-          <a href="/data/models.json">Models JSON</a>
-          <a href="/data/benchmarks.json">Benchmarks JSON</a>
-          <a href="/data/subscription-task-estimates.json">Task estimates JSON</a>
-          <a href="/schema/community-benchmark-submission.schema.json">Contribution schema</a>
+          <a href="/data/buyer-guide.json">Download data</a>
+          <a href="/methodology">Calculation math</a>
+          <a href="https://github.com/siraht/TokenmaxxDash">GitHub</a>
         </div>
       </footer>
     </div>
