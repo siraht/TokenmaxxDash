@@ -13,7 +13,9 @@
     const empty = document.querySelector('[data-buyer-empty]');
     const body = buyerTable.querySelector('tbody');
     const metric = (row, key, mixId, fallback = 999999) => {
-      const value = Number(row.dataset[`${mixId}${key}`]);
+      const raw = row.dataset[`${mixId}${key}`];
+      if (raw == null || raw.trim() === '') return fallback;
+      const value = Number(raw);
       return Number.isFinite(value) ? value : fallback;
     };
     const updateVisibleMetricText = (row, mixId) => {
