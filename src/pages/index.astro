@@ -30,6 +30,8 @@ const rows = [...guide.rows].sort((a, b) => (a.standard.qualityAdjustedUsdPerM ?
     <article class="kpi"><strong>{guide.summary.comparisonClassCounts?.token || 0}</strong><span>token-denominated plans</span></article>
     <article class="kpi"><strong>{guide.summary.comparisonClassCounts?.request || 0}</strong><span>request-denominated plans</span></article>
     <article class="kpi"><strong>{guide.summary.comparisonClassCounts?.managed || 0}</strong><span>managed/work-unit plans</span></article>
+    <article class="kpi"><strong>{guide.summary.comparisonClassCounts?.relative || 0}</strong><span>relative-capacity plans</span></article>
+    <article class="kpi"><strong>{guide.summary.comparisonClassCounts?.calibratable || 0}</strong><span>account-calibratable plans</span></article>
     <article class="kpi"><strong>{guide.summary.comparisonClassCounts?.['provider-hidden'] || 0}</strong><span>provider-hidden numeric pools</span></article>
   </div></section>
 
@@ -79,7 +81,7 @@ const rows = [...guide.rows].sort((a, b) => (a.standard.qualityAdjustedUsdPerM ?
     ))}</div>
   </section>
 
-  <section class="section"><div class="section-heading"><div><p class="section-kicker">Every researched plan</p><h2>Token, request, managed, relative, and provider-hidden products</h2></div><a href="/plans">Open full plan catalog →</a></div>
+  <section class="section"><div class="section-heading"><div><p class="section-kicker">Every researched plan</p><h2>Token, request, managed, relative, calibratable, and provider-hidden products</h2></div><a href="/plans">Open full plan catalog →</a></div>
     <div class="plan-grid" data-plan-grid>{guide.planSummaries.map((plan) => (
       <a class="plan-card" href={`/plans/${plan.id}`} data-plan-card data-search={`${plan.provider} ${plan.plan} ${plan.comparisonClass}`.toLowerCase()} data-provider={plan.provider} data-confidence={plan.confidence} data-quantified={plan.tokenRouteCount || plan.requestRouteCount ? 'yes' : 'no'} data-price={plan.priceUsd} data-quality-cost={plan.bestAgenticQualityCost ?? 999999}><div class="topline"><div><strong>{plan.provider}</strong><span class="cell-sub">{plan.plan}</span></div><span class="price">${plan.priceUsd.toFixed(2)}</span></div><p>{plan.comparisonClass} · {plan.researchStatus}</p><div class="best"><strong>{plan.bestAgenticModel || `${plan.allowanceKind} allowance`}</strong><span class="cell-sub">{plan.bestAgenticQualityCost != null ? `${money(plan.bestAgenticQualityCost, 4)} quality-adjusted $/M` : plan.missingFields.slice(0, 2).join(' · ')}</span></div></a>
     ))}</div>
